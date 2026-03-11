@@ -95,4 +95,4 @@ img = np.clip(img, 0, 255).astype(np.uint8)
 
 # Save to ouput path
 cv2.imwrite(kodak_portra_output, img)
-print(f"✅ Saved: {kodak_portra_output}")
+print(f"SUCCESS: Saved {kodak_portra_output}")
