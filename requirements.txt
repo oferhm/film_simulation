@@ -1,0 +1,8 @@
+# opencv-python==4.8.1.78
+# numpy==1.24.3
+
+opencv-python=4.13.0.92
+numpy=2.4.3
+
+
+

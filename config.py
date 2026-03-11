@@ -1,0 +1,7 @@
+input = "input/photo.jpg"
+# input = "film_filters/input/raw_photo.ARW"
+kodak_portra_output = "output/kodak_portra.jpg"
+kodak_portra_output_1 = "output/kodak_portra_more1.jpg"
+ektar_100_output = "output/ektar_100.jpg"
+vintage_1_output = "output/vintage_1.jpg"
+vintage_2_output = "output/vintage_2.jpg"
