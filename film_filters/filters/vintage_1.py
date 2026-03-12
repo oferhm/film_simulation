@@ -27,7 +27,7 @@ def ektar_curve(image):
     curve = np.linspace(0, 1, 256)
 
     # softer S-curve than before
-    curve = curve + 0.15 * (curve - 0.5)
+    curve = curve + 0.08 * (curve - 0.5)
 
     curve = np.clip(curve, 0, 1)
 
@@ -75,8 +75,11 @@ mask = img > 0.85
 img[mask] = img[mask] * 0.92 + blur[mask] * 0.08
 
 
+# ---------- Increase exposure by 10% ----------
+img = np.clip(img * 1.10, 0, 1)
+
 # ---------- Very fine grain (Ektar is clean) ----------
-grain_strength = 0.008
+grain_strength = 0.02
 noise = np.random.normal(0, grain_strength, img.shape)
 
 img = np.clip(img + noise, 0, 1)

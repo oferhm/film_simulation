@@ -65,7 +65,7 @@ img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
 # ---------- Slight shadow depth ----------
-img = np.power(img, 1.02)
+img = np.power(img, 1.1)
 
 
 # ---------- Very light highlight bloom ----------
@@ -76,10 +76,14 @@ img[mask] = img[mask] * 0.92 + blur[mask] * 0.08
 
 
 # ---------- Very fine grain (Ektar is clean) ----------
-grain_strength = 0.008
+grain_strength = 0.017
 noise = np.random.normal(0, grain_strength, img.shape)
 
 img = np.clip(img + noise, 0, 1)
+
+# ---------- Shadow lift ----------
+shadow_lift = 0.07
+img = np.clip(img + shadow_lift * (1 - img), 0, 1)
 
 
 # ---------- Save ----------
