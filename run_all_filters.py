@@ -3,6 +3,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from film_filters.photo_collage import PhotoCollage
 
 # Get the correct Python executable (from virtual environment)
 python_exe = sys.executable
@@ -86,3 +87,21 @@ else:
     print("\n🎉 All filters ran successfully!")
 
 print("=" * 60)
+
+# Create photo collage if all filters succeeded
+if success_count > 0:
+    print("\n🖼️  Creating photo collage...")
+    try:
+        collage_creator = PhotoCollage()
+        collage_success = collage_creator.create_collage()
+        
+        if collage_success:
+            print("✨ Photo collage created successfully!")
+        else:
+            print("⚠️  Collage creation failed, but filters completed successfully.")
+            
+    except Exception as e:
+        print(f"❌ Error creating collage: {e}")
+        print("⚠️  Filters completed successfully, but collage creation failed.")
+
+print("\n" + "=" * 60)
