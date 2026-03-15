@@ -16,9 +16,9 @@ import cv2
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QPushButton, QScrollArea, 
-                            QFileDialog, QMessageBox, QFrame, QSizePolicy)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QPixmap, QImage, QFont
+                            QFileDialog, QMessageBox, QFrame, QSizePolicy, QShortcut)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QPoint
+from PyQt5.QtGui import QPixmap, QImage, QFont, QCursor, QKeySequence
 import importlib.util
 from pathlib import Path
 
@@ -29,6 +29,15 @@ except ImportError:
     # Fallback if config not found
     class config:
         upload_photo_path = ""
+
+# Import dynamic config for persistent paths
+try:
+    import dynamic_config
+except ImportError:
+    # Fallback if dynamic_config not found
+    class dynamic_config:
+        import_folder_path = ""
+        export_folder_path = ""
 
 
 class FilterButton(QPushButton):
@@ -382,12 +391,23 @@ class FilmFilterGUI(QMainWindow):
         self.currently_hovering_filter = None  # Track which filter is being hovered
         self.selected_filter = None  # Track currently selected filter
         self.selected_filter_button = None  # Track selected button
+        self.original_filename = None  # Track original filename for save suggestions
+        self.is_zoomed = False  # Track zoom state
+        self.original_pixmap = None  # Store original pixmap for zoom
+        self.dragging = False  # Track drag state
+        self.last_pan_point = QPoint()  # Last mouse position for dragging
+        self.left_click_start_pos = QPoint()  # Track left-click start position
+        self.zoom_center_point = None  # Point to center when zooming
         
         # Get available filters
         self.filters_dir = "film_filters/filters"
         self.available_filters = self.get_available_filters()
         
         self.init_ui()
+        
+        # Add keyboard shortcut for toggle comparison
+        self.toggle_shortcut = QShortcut(QKeySequence("\\"), self)
+        self.toggle_shortcut.activated.connect(self.toggle_comparison)
     
     def init_ui(self):
         """Initialize the user interface."""
@@ -397,17 +417,27 @@ class FilmFilterGUI(QMainWindow):
         # Create central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QHBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
         
+        # Top toolbar with Import button
+        top_toolbar = self.create_top_toolbar()
+        main_layout.addWidget(top_toolbar)
+        
+        # Main content area
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(8)
+        
         # Left side - Image display (takes most space)
         image_panel = self.create_image_panel()
-        main_layout.addWidget(image_panel, 3)  # 75% of space
+        content_layout.addWidget(image_panel, 3)  # 75% of space
         
         # Right side - Controls panel
         controls_panel = self.create_controls_panel()
-        main_layout.addWidget(controls_panel, 1)  # 25% of space
+        content_layout.addWidget(controls_panel, 1)  # 25% of space
+        
+        main_layout.addLayout(content_layout)
         
         # Set modern window style
         self.setStyleSheet("""
@@ -454,19 +484,118 @@ class FilmFilterGUI(QMainWindow):
                 background-color: #2d2d2d;
                 border-radius: 6px;
             }
+            /* Enhanced Scroll Bars - Vertical */
             QScrollBar:vertical {
-                border: none;
-                background: #2d2d2d;
-                width: 12px;
-                border-radius: 6px;
+                border: 1px solid #404040;
+                background: #1e1e1e;
+                width: 20px;
+                border-radius: 10px;
+                margin: 22px 0 22px 0;
             }
             QScrollBar::handle:vertical {
                 background: #555555;
-                border-radius: 6px;
-                min-height: 20px;
+                border: 1px solid #666666;
+                border-radius: 8px;
+                min-height: 30px;
+                margin: 1px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #666666;
+                background: #0078d4;
+                border-color: #106ebe;
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: #005a9e;
+                border-color: #004578;
+            }
+            QScrollBar::add-line:vertical {
+                border: 1px solid #404040;
+                background: #2d2d2d;
+                height: 20px;
+                border-radius: 10px;
+                subcontrol-position: bottom;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-line:vertical {
+                border: 1px solid #404040;
+                background: #2d2d2d;
+                height: 20px;
+                border-radius: 10px;
+                subcontrol-position: top;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::add-line:vertical:hover,
+            QScrollBar::sub-line:vertical:hover {
+                background: #3d3d3d;
+                border-color: #555555;
+            }
+            QScrollBar::add-line:vertical:pressed,
+            QScrollBar::sub-line:vertical:pressed {
+                background: #1e1e1e;
+            }
+            QScrollBar:up-arrow:vertical, QScrollBar:down-arrow:vertical {
+                width: 8px;
+                height: 8px;
+                background: #888888;
+            }
+            QScrollBar:up-arrow:vertical:hover, QScrollBar:down-arrow:vertical:hover {
+                background: #aaaaaa;
+            }
+            
+            /* Enhanced Scroll Bars - Horizontal */
+            QScrollBar:horizontal {
+                border: 1px solid #404040;
+                background: #1e1e1e;
+                height: 20px;
+                border-radius: 10px;
+                margin: 0 22px 0 22px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #555555;
+                border: 1px solid #666666;
+                border-radius: 8px;
+                min-width: 30px;
+                margin: 1px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #0078d4;
+                border-color: #106ebe;
+            }
+            QScrollBar::handle:horizontal:pressed {
+                background: #005a9e;
+                border-color: #004578;
+            }
+            QScrollBar::add-line:horizontal {
+                border: 1px solid #404040;
+                background: #2d2d2d;
+                width: 20px;
+                border-radius: 10px;
+                subcontrol-position: right;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::sub-line:horizontal {
+                border: 1px solid #404040;
+                background: #2d2d2d;
+                width: 20px;
+                border-radius: 10px;
+                subcontrol-position: left;
+                subcontrol-origin: margin;
+            }
+            QScrollBar::add-line:horizontal:hover,
+            QScrollBar::sub-line:horizontal:hover {
+                background: #3d3d3d;
+                border-color: #555555;
+            }
+            QScrollBar::add-line:horizontal:pressed,
+            QScrollBar::sub-line:horizontal:pressed {
+                background: #1e1e1e;
+            }
+            QScrollBar:left-arrow:horizontal, QScrollBar:right-arrow:horizontal {
+                width: 8px;
+                height: 8px;
+                background: #888888;
+            }
+            QScrollBar:left-arrow:horizontal:hover, QScrollBar:right-arrow:horizontal:hover {
+                background: #aaaaaa;
             }
             .title-label {
                 font-size: 18px;
@@ -506,6 +635,114 @@ class FilmFilterGUI(QMainWindow):
             }
         """)
     
+    def create_top_toolbar(self):
+        """Create the top toolbar with Import button."""
+        toolbar = QFrame()
+        toolbar.setStyleSheet("""
+            QFrame {
+                background-color: #2d2d2d;
+                border: 1px solid #404040;
+                border-radius: 8px;
+                padding: 8px;
+            }
+        """)
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(12, 8, 12, 8)
+        
+        # Import button (styled like filter buttons)
+        self.load_btn = QPushButton("Import Photos")
+        self.load_btn.setFixedHeight(36)
+        self.load_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3c3c3c;
+                border: 1px solid #555555;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: 500;
+                color: #ffffff;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #4c4c4c;
+                border-color: #777777;
+            }
+            QPushButton:pressed {
+                background-color: #2c2c2c;
+            }
+        """)
+        self.load_btn.clicked.connect(self.load_image)
+        toolbar_layout.addWidget(self.load_btn)
+        
+        # Import path label
+        self.import_path_label = QLabel()
+        self.import_path_label.setStyleSheet("""
+            QLabel {
+                color: #888888;
+                font-size: 11px;
+                padding: 4px 8px;
+                background-color: transparent;
+                max-width: 300px;
+                min-width: 200px;
+            }
+        """)
+        self.update_import_path_label()
+        toolbar_layout.addWidget(self.import_path_label)
+        
+        # Add larger stretch to position save button more to the left
+        toolbar_layout.addStretch(2)
+        
+        # Save button (styled like filter buttons)
+        self.save_btn = QPushButton("Save as")
+        self.save_btn.setFixedHeight(36)
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3c3c3c;
+                border: 1px solid #555555;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                font-weight: 500;
+                color: #ffffff;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: #4c4c4c;
+                border-color: #777777;
+            }
+            QPushButton:pressed {
+                background-color: #2c2c2c;
+            }
+            QPushButton:disabled {
+                background-color: #282828;
+                color: #666666;
+                border-color: #333333;
+            }
+        """)
+        self.save_btn.clicked.connect(self.save_image)
+        self.save_btn.setEnabled(False)  # Disabled until image is loaded
+        toolbar_layout.addWidget(self.save_btn)
+        
+        # Save path label
+        self.save_path_label = QLabel()
+        self.save_path_label.setStyleSheet("""
+            QLabel {
+                color: #888888;
+                font-size: 11px;
+                padding: 4px 8px;
+                background-color: transparent;
+                max-width: 300px;
+                min-width: 200px;
+            }
+        """)
+        self.update_save_path_label()
+        toolbar_layout.addWidget(self.save_path_label)
+        
+        # Add larger stretch after save button
+        toolbar_layout.addStretch(2)
+        
+        return toolbar
+    
     def create_image_panel(self):
         """Create the modern image display panel."""
         panel = QFrame()
@@ -530,6 +767,10 @@ class FilmFilterGUI(QMainWindow):
                 border-radius: 8px;
             }
         """)
+        # Configure scroll area for robust dragging with thick scroll bars
+        self.image_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.image_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.image_scroll.setAlignment(Qt.AlignCenter)
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setMinimumSize(800, 500)
@@ -539,11 +780,30 @@ class FilmFilterGUI(QMainWindow):
             font-size: 16px;
             font-weight: 500;
         """)
-        self.image_label.setText("🖼️  Load an image to get started")
+        self.image_label.setText("🖼️  Import photos")
+        
+        # Enable mouse click events for zoom functionality
+        self.image_label.mousePressEvent = self.image_mouse_press
+        self.image_label.mouseMoveEvent = self.image_mouse_move
+        self.image_label.mouseReleaseEvent = self.image_mouse_release
+        self.image_label.setMouseTracking(True)
         
         self.image_scroll.setWidget(self.image_label)
-        self.image_scroll.setWidgetResizable(True)
+        self.image_scroll.setWidgetResizable(True)  # Default: allow widget to resize
         layout.addWidget(self.image_scroll)
+        
+        # Image name label
+        self.image_name_label = QLabel("No image loaded")
+        self.image_name_label.setAlignment(Qt.AlignCenter)
+        self.image_name_label.setStyleSheet("""
+            background-color: transparent;
+            color: #aaaaaa;
+            font-size: 12px;
+            font-weight: 400;
+            padding: 8px;
+            border: none;
+        """)
+        layout.addWidget(self.image_name_label)
         
         # Bottom toolbar
         toolbar = QFrame()
@@ -558,29 +818,7 @@ class FilmFilterGUI(QMainWindow):
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(12, 8, 12, 8)
         
-        # Load button
-        self.load_btn = QPushButton("📁  Load Photo")
-        self.load_btn.setObjectName("loadButton")
-        self.load_btn.setStyleSheet("""
-            #loadButton {
-                background-color: #0078d4;
-                border: 1px solid #106ebe;
-                color: white;
-                font-size: 14px;
-                font-weight: 600;
-                padding: 14px 24px;
-                border-radius: 8px;
-            }
-            #loadButton:hover {
-                background-color: #106ebe;
-                border-color: #005a9e;
-            }
-            #loadButton:pressed {
-                background-color: #005a9e;
-            }
-        """)
-        self.load_btn.clicked.connect(self.load_image)
-        toolbar_layout.addWidget(self.load_btn)
+        # Remove the load button from here as it's now in top toolbar
         
         # Add spacer
         toolbar_layout.addStretch()
@@ -591,9 +829,10 @@ class FilmFilterGUI(QMainWindow):
         comparison_layout.setContentsMargins(0, 0, 0, 0)
         comparison_layout.setSpacing(4)
         
-        self.before_btn = QPushButton("📷 Original")
-        self.before_btn.setObjectName("comparisonButton")
-        self.before_btn.setStyleSheet("""
+        # Toggle comparison button
+        self.toggle_btn = QPushButton("Edited")
+        self.toggle_btn.setObjectName("comparisonButton")
+        self.toggle_btn.setStyleSheet("""
             #comparisonButton {
                 background-color: #4a4a4a;
                 border: 1px solid #666666;
@@ -607,34 +846,32 @@ class FilmFilterGUI(QMainWindow):
                 background-color: #5a5a5a;
             }
         """)
-        self.before_btn.clicked.connect(self.show_before)
-        self.before_btn.setEnabled(False)
-        comparison_layout.addWidget(self.before_btn)
-        
-        self.after_btn = QPushButton("🎨 Filtered")
-        self.after_btn.setObjectName("comparisonButton")
-        self.after_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4a4a4a;
-                border: 1px solid #666666;
-                color: white;
-                font-size: 12px;
-                font-weight: 500;
-                padding: 10px 20px;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #5a5a5a;
-            }
-        """)
-        self.after_btn.clicked.connect(self.show_after)
-        self.after_btn.setEnabled(False)
-        comparison_layout.addWidget(self.after_btn)
+        self.toggle_btn.clicked.connect(self.toggle_comparison)
+        self.toggle_btn.setEnabled(False)
+        comparison_layout.addWidget(self.toggle_btn)
         
         toolbar_layout.addWidget(comparison_frame)
         layout.addWidget(toolbar)
         
         return panel
+    
+    def update_import_path_label(self):
+        """Update the import path label display."""
+        path = getattr(dynamic_config, 'import_folder_path', '')
+        if path:
+            # Show full path without prefix
+            self.import_path_label.setText(path)
+        else:
+            self.import_path_label.setText("")
+    
+    def update_save_path_label(self):
+        """Update the save path label display."""
+        path = getattr(dynamic_config, 'export_folder_path', '')
+        if path:
+            # Show full path without prefix
+            self.save_path_label.setText(path)
+        else:
+            self.save_path_label.setText("")
     
     def create_controls_panel(self):
         """Create the modern controls panel with filter buttons."""
@@ -724,22 +961,6 @@ class FilmFilterGUI(QMainWindow):
         scroll_area.setWidgetResizable(True)
         layout.addWidget(scroll_area)
         
-        # Status section
-        self.status_label = QLabel("Ready to load photos")
-        self.status_label.setObjectName("statusLabel")
-        self.status_label.setWordWrap(True)
-        self.status_label.setStyleSheet("""
-            #statusLabel {
-                background-color: #333333;
-                padding: 16px;
-                border-radius: 8px;
-                font-size: 11px;
-                color: #cccccc;
-                border: 1px solid #444444;
-            }
-        """)
-        layout.addWidget(self.status_label)
-        
         return panel
     
     def get_available_filters(self):
@@ -762,10 +983,110 @@ class FilmFilterGUI(QMainWindow):
         
         return filters
     
+    def update_dynamic_config(self, key, value):
+        """Update a value in dynamic_config.py file."""
+        try:
+            config_file = "dynamic_config.py"
+            
+            print(f"Updating {key} = {value}")  # Debug output
+            
+            # Read current content
+            with open(config_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            print(f"Current content: {repr(content)}")  # Debug output
+            
+            # Update the specific line
+            lines = content.split('\n')
+            updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith(f'{key} ='):
+                    lines[i] = f'{key} = "{value}"'
+                    updated = True
+                    print(f"Updated line {i}: {lines[i]}")  # Debug output
+                    break
+            
+            if not updated:
+                print(f"Could not find line for key: {key}")  # Debug output
+                return
+                
+            # Write back to file
+            with open(config_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+                
+            # Update the imported module's attribute
+            setattr(dynamic_config, key, value)
+            print(f"Successfully updated {key}")  # Debug output
+            
+        except Exception as e:
+            print(f"Error updating dynamic config: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_image_unicode(self, file_path):
+        """Load image that handles Unicode file paths properly."""
+        try:
+            # Use numpy to read file as bytes, then decode with OpenCV
+            # This method handles Unicode characters in file paths
+            img_array = np.fromfile(file_path, dtype=np.uint8)
+            if img_array.size == 0:
+                return None
+            
+            # Decode the image from bytes
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            return img
+            
+        except Exception as e:
+            print(f"Error loading Unicode image: {e}")
+            return None
+    
+    def save_image_unicode(self, file_path, image):
+        """Save image that handles Unicode file paths properly."""
+        try:
+            # Encode image to memory buffer
+            is_success, buffer = cv2.imencode('.jpg', image)
+            if not is_success:
+                return False
+            
+            # Write buffer to file using Python's file handling (supports Unicode paths)
+            with open(file_path, 'wb') as f:
+                f.write(buffer.tobytes())
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error saving Unicode image: {e}")
+            return False
+    
+    def show_temp_popup(self, message):
+        """Show a temporary popup message that disappears after 1 second."""
+        popup = QMessageBox(self)
+        popup.setWindowTitle("")
+        popup.setText(message)
+        popup.setIcon(QMessageBox.NoIcon)  # Remove any icon
+        popup.setStandardButtons(QMessageBox.NoButton)  # No buttons
+        popup.setStyleSheet("""
+            QMessageBox {
+                background-color: #2d2d2d;
+                color: #ffffff;
+                font-size: 16px;
+                font-weight: 600;
+                border: 2px solid #0078d4;
+                border-radius: 8px;
+                padding: 20px;
+            }
+        """)
+        
+        # Show the popup
+        popup.show()
+        
+        # Set up timer to close after 1 second
+        QTimer.singleShot(1000, popup.accept)
+    
     def load_image(self):
         """Load an image file."""
-        # Use config upload_photo_path as default directory
-        default_dir = getattr(config, 'upload_photo_path', '')
+        # Use saved import path, fallback to root if empty
+        default_dir = getattr(dynamic_config, 'import_folder_path', '') or '/'
         
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
@@ -775,13 +1096,48 @@ class FilmFilterGUI(QMainWindow):
         )
         
         if file_path:
+            # Save the directory path for future use
+            folder_path = os.path.dirname(file_path)
+            self.update_dynamic_config('import_folder_path', folder_path)
+            self.update_import_path_label()
             try:
-                # Load image with OpenCV
-                self.original_image = cv2.imread(file_path)
+                # Debug: Print file path and check if file exists
+                print(f"Attempting to load: {file_path}")
+                print(f"File exists: {os.path.exists(file_path)}")
+                
+                # Load image with OpenCV - handle Unicode paths
+                self.original_image = self.load_image_unicode(file_path)
                 
                 if self.original_image is None:
-                    QMessageBox.critical(self, "Error", "Could not load the selected image.")
+                    # More detailed error information
+                    if not os.path.exists(file_path):
+                        QMessageBox.critical(self, "Error", f"File does not exist:\n{file_path}")
+                    else:
+                        # Try to determine file format
+                        file_ext = os.path.splitext(file_path)[1].lower()
+                        supported_formats = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+                        
+                        if file_ext not in supported_formats:
+                            QMessageBox.critical(self, "Error", 
+                                f"Unsupported file format: {file_ext}\n"
+                                f"Supported formats: {', '.join(supported_formats)}")
+                        else:
+                            QMessageBox.critical(self, "Error", 
+                                f"Could not load the selected image.\n"
+                                f"The file might be corrupted or in an unsupported format.\n"
+                                f"File: {file_path}")
+                    # Reset image name on failed load
+                    if hasattr(self, 'image_name_label'):
+                        self.image_name_label.setText("No image loaded")
+                    # Reset original filename and zoom state
+                    self.original_filename = None
+                    self.is_zoomed = False
+                    self.original_pixmap = None
+                    self.dragging = False
                     return
+                
+                # Store original filename for save suggestions
+                self.original_filename = os.path.basename(file_path)
                 
                 # Reset state
                 self.current_filtered_image = None
@@ -789,6 +1145,11 @@ class FilmFilterGUI(QMainWindow):
                 self.preview_cache.clear()  # Clear preview cache for new image
                 self.is_hovering = False
                 self.currently_hovering_filter = None
+                
+                # Reset zoom state
+                self.is_zoomed = False
+                self.original_pixmap = None
+                self.dragging = False
                 
                 # Reset filter selection
                 if self.selected_filter_button:
@@ -799,20 +1160,280 @@ class FilmFilterGUI(QMainWindow):
                 # Display the image
                 self.display_image(self.original_image)
                 
-                # Enable filter buttons
+                # Enable filter buttons and save button
                 if hasattr(self, 'filter_buttons'):
                     for btn in self.filter_buttons:
                         btn.setEnabled(True)
                 
-                # Enable original button, disable filtered button
-                self.before_btn.setEnabled(True)
-                self.after_btn.setEnabled(False)
+                # Enable save button
+                if hasattr(self, 'save_btn'):
+                    self.save_btn.setEnabled(True)
                 
-                # Update status
-                self.status_label.setText(f"✅ Loaded: {os.path.basename(file_path)}")
+                # Enable toggle button
+                self.toggle_btn.setEnabled(True)
+                
+                # Update image name display
+                self.image_name_label.setText(os.path.basename(file_path))
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
+                # Reset image name on error
+                if hasattr(self, 'image_name_label'):
+                    self.image_name_label.setText("No image loaded")
+                # Reset original filename and zoom state
+                self.original_filename = None
+                self.is_zoomed = False
+                self.original_pixmap = None
+                self.dragging = False
+    
+    def get_next_available_filename(self, folder_path, base_name, extension):
+        """Find the next available filename with incrementing number suffix."""
+        counter = 1
+        while True:
+            if counter == 1:
+                # First try with _01
+                new_filename = f"{base_name}_01{extension}"
+            else:
+                # Increment with zero-padding
+                new_filename = f"{base_name}_{counter:02d}{extension}"
+            
+            full_path = os.path.join(folder_path, new_filename)
+            if not os.path.exists(full_path):
+                return new_filename
+            counter += 1
+            
+            # Safety break to avoid infinite loop (max 999 files)
+            if counter > 999:
+                # Fallback to timestamp if too many files
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                return f"{base_name}_{timestamp}{extension}"
+    
+    def save_image(self):
+        """Save the current image (filtered or original) with Save As dialog."""
+        if self.original_image is None:
+            QMessageBox.warning(self, "Warning", "No image loaded to save.")
+            return
+        
+        # Use saved export path, fallback to root if empty
+        default_dir = getattr(dynamic_config, 'export_folder_path', '') or '/'
+        
+        # Create suggested filename based on original image name
+        if hasattr(self, 'original_filename') and self.original_filename:
+            # Get base name without extension
+            base_name = os.path.splitext(self.original_filename)[0]
+            original_ext = os.path.splitext(self.original_filename)[1].lower()
+            
+            # Use original extension or default to .jpg
+            if original_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']:
+                file_ext = original_ext
+            else:
+                file_ext = '.jpg'
+            
+            # Find next available filename
+            suggested_filename = self.get_next_available_filename(default_dir, base_name, file_ext)
+        else:
+            # Fallback to timestamp-based naming
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
+                suffix = "_filtered"
+            else:
+                suffix = "_original"
+            suggested_filename = f"image_{timestamp}{suffix}.jpg"
+        
+        # Combine default directory with suggested filename
+        default_path = os.path.join(default_dir, suggested_filename)
+        
+        # Determine which image to save
+        if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
+            image_to_save = self.current_filtered_image
+        else:
+            image_to_save = self.original_image
+        
+        # Open Save As dialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Image As",
+            default_path,
+            "JPEG Images (*.jpg);;PNG Images (*.png);;All Images (*.jpg *.png *.bmp *.tiff)"
+        )
+        
+        if file_path:
+            # Save the directory path for future use
+            folder_path = os.path.dirname(file_path)
+            self.update_dynamic_config('export_folder_path', folder_path)
+            self.update_save_path_label()
+            
+            try:
+                # Save the image using Unicode-safe method
+                success = self.save_image_unicode(file_path, image_to_save)
+                
+                if success:
+                    pass  # Image saved successfully without popup
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to save image.")
+                    
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error saving image: {str(e)}")
+                print(f"Error saving image: {e}")
+    
+    def image_mouse_press(self, event):
+        """Handle mouse press events on image."""
+        if self.original_image is not None and self.original_pixmap is not None:
+            if event.button() == Qt.LeftButton:
+                # Store left-click start position
+                self.left_click_start_pos = event.pos()
+                
+                # Calculate click position relative to the image for zoom centering
+                if not self.is_zoomed:
+                    self.calculate_zoom_center_point(event.pos())
+                    
+                if self.is_zoomed:
+                    # Prepare for potential dragging when zoomed
+                    self.last_pan_point = event.pos()
+    
+    def image_mouse_move(self, event):
+        """Handle mouse move events for dragging."""
+        if event.buttons() == Qt.LeftButton and self.is_zoomed:
+            # Start dragging if we moved far enough from start position
+            if not self.dragging:
+                move_distance = (event.pos() - self.left_click_start_pos).manhattanLength()
+                if move_distance > 5:  # Start drag after 5 pixel movement
+                    self.dragging = True
+                    self.image_label.setCursor(QCursor(Qt.ClosedHandCursor))
+            
+            if self.dragging:
+                # Calculate movement delta
+                delta = event.pos() - self.last_pan_point
+                
+                # Get current scroll bar positions
+                h_scroll = self.image_scroll.horizontalScrollBar()
+                v_scroll = self.image_scroll.verticalScrollBar()
+                
+                # Update scroll positions (negative delta for natural movement)
+                h_scroll.setValue(h_scroll.value() - delta.x())
+                v_scroll.setValue(v_scroll.value() - delta.y())
+                
+            self.last_pan_point = event.pos()
+    
+    def image_mouse_release(self, event):
+        """Handle mouse release events."""
+        if event.button() == Qt.LeftButton:
+            if self.dragging:
+                # End dragging
+                self.dragging = False
+                # Return to hand cursor when zoomed
+                if self.is_zoomed:
+                    self.image_label.setCursor(QCursor(Qt.OpenHandCursor))
+                else:
+                    self.image_label.setCursor(QCursor(Qt.ArrowCursor))
+            else:
+                # Short left-click without drag = toggle zoom
+                move_distance = (event.pos() - self.left_click_start_pos).manhattanLength()
+                if move_distance <= 5:  # Consider it a short click
+                    self.toggle_zoom()
+    
+    def calculate_zoom_center_point(self, click_pos):
+        """Calculate the point in original image coordinates that should be centered when zooming."""
+        try:
+            # Get current pixmap and its display size
+            current_pixmap = self.image_label.pixmap()
+            if not current_pixmap or self.original_pixmap is None:
+                return
+                
+            # Get the displayed image rectangle within the label
+            label_rect = self.image_label.rect()
+            pixmap_rect = current_pixmap.rect()
+            
+            # Calculate the actual display rectangle (centered and scaled)
+            scale_x = pixmap_rect.width() / self.original_pixmap.width()
+            scale_y = pixmap_rect.height() / self.original_pixmap.height()
+            scale = min(scale_x, scale_y)  # Keep aspect ratio
+            
+            scaled_width = int(self.original_pixmap.width() * scale)
+            scaled_height = int(self.original_pixmap.height() * scale)
+            
+            # Center the scaled image in the label
+            x_offset = (label_rect.width() - scaled_width) // 2
+            y_offset = (label_rect.height() - scaled_height) // 2
+            
+            # Convert click position to image coordinates
+            image_x = (click_pos.x() - x_offset) / scale
+            image_y = (click_pos.y() - y_offset) / scale
+            
+            # Clamp to image bounds
+            image_x = max(0, min(image_x, self.original_pixmap.width()))
+            image_y = max(0, min(image_y, self.original_pixmap.height()))
+            
+            self.zoom_center_point = QPoint(int(image_x), int(image_y))
+            
+        except Exception as e:
+            print(f"Error calculating zoom center: {e}")
+            self.zoom_center_point = None
+    
+    def image_click_event(self, event):
+        """Handle mouse click on image for zoom functionality."""
+        if self.original_image is not None and self.original_pixmap is not None:
+            self.toggle_zoom()
+    
+    def toggle_zoom(self):
+        """Toggle between fit-to-window and 100% zoom."""
+        if self.is_zoomed:
+            # Zoom out - fit to window
+            self.zoom_fit_to_window()
+        else:
+            # Zoom in - 100% size
+            self.zoom_100_percent()
+        
+        self.is_zoomed = not self.is_zoomed
+    
+    def zoom_fit_to_window(self):
+        """Zoom image to fit the display area."""
+        if self.original_pixmap:
+            # Enable widget resizing for fit-to-window mode
+            self.image_scroll.setWidgetResizable(True)
+            
+            label_size = self.image_label.size()
+            scaled_pixmap = self.original_pixmap.scaled(label_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.image_label.setPixmap(scaled_pixmap)
+            
+            # Set normal cursor when not zoomed
+            self.image_label.setCursor(QCursor(Qt.ArrowCursor))
+    
+    def zoom_100_percent(self):
+        """Display image at 100% (original) size."""
+        if self.original_pixmap:
+            # Disable widget resizing for 100% zoom to enable scrolling
+            self.image_scroll.setWidgetResizable(False)
+            
+            # Set label size to image size for proper scrolling
+            self.image_label.resize(self.original_pixmap.size())
+            self.image_label.setPixmap(self.original_pixmap)
+            
+            # Center the view on the clicked point if available
+            if self.zoom_center_point:
+                QTimer.singleShot(10, self.center_view_on_point)  # Delay to ensure scroll area is updated
+            
+            # Set hand cursor when zoomed
+            self.image_label.setCursor(QCursor(Qt.OpenHandCursor))
+    
+    def center_view_on_point(self):
+        """Center the scroll view on the previously clicked point."""
+        if self.zoom_center_point:
+            # Get scroll area dimensions
+            scroll_area_size = self.image_scroll.viewport().size()
+            
+            # Calculate scroll position to center the clicked point
+            center_x = self.zoom_center_point.x() - scroll_area_size.width() // 2
+            center_y = self.zoom_center_point.y() - scroll_area_size.height() // 2
+            
+            # Set scroll bar positions
+            h_scroll = self.image_scroll.horizontalScrollBar()
+            v_scroll = self.image_scroll.verticalScrollBar()
+            
+            h_scroll.setValue(center_x)
+            v_scroll.setValue(center_y)
     
     def display_image(self, cv_image):
         """Display a CV2 image in the QLabel."""
@@ -824,8 +1445,15 @@ class FilmFilterGUI(QMainWindow):
         bytes_per_line = ch * w
         qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
         
-        # Convert to QPixmap and scale
+        # Convert to QPixmap and store original
         pixmap = QPixmap.fromImage(qt_image)
+        self.original_pixmap = pixmap  # Store for zoom functionality
+        
+        # Reset zoom state when displaying new image
+        self.is_zoomed = False
+        
+        # Ensure widget is resizable for fit-to-window mode
+        self.image_scroll.setWidgetResizable(True)
         
         # Scale pixmap to fit the display area while maintaining aspect ratio
         label_size = self.image_label.size()
@@ -843,7 +1471,6 @@ class FilmFilterGUI(QMainWindow):
             return  # Don't start new filter while one is running
         
         # Update status
-        self.status_label.setText(f"🔄 Applying {filter_name}...")
         
         # Disable filter buttons temporarily
         if hasattr(self, 'filter_buttons'):
@@ -895,10 +1522,10 @@ class FilmFilterGUI(QMainWindow):
         # Show original image
         if self.original_image is not None:
             self.display_image(self.original_image)
-            self.status_label.setText("📷 Showing original image")
         
-        # Disable filtered button
-        self.after_btn.setEnabled(False)
+        # Disable toggle button when no filter
+        if hasattr(self, 'toggle_btn'):
+            self.toggle_btn.setEnabled(False)
     
     def on_filter_applied(self, filtered_image, filter_name):
         """Handle filter application completion."""
@@ -908,8 +1535,10 @@ class FilmFilterGUI(QMainWindow):
         # Display the filtered image
         self.display_image(filtered_image)
         
-        # Enable filtered button
-        self.after_btn.setEnabled(True)
+        # Enable toggle button and update text
+        if hasattr(self, 'toggle_btn'):
+            self.toggle_btn.setEnabled(True)
+            self.update_toggle_button_text()
         
         # Re-enable filter buttons
         if hasattr(self, 'filter_buttons'):
@@ -917,11 +1546,14 @@ class FilmFilterGUI(QMainWindow):
                 btn.setEnabled(True)
         
         # Update status
-        self.status_label.setText(f"✅ Applied {filter_name}")
     
     def on_filter_hover(self, filter_name, filter_path):
         """Handle filter button hover - show preview."""
         if self.original_image is None or (self.filter_worker and self.filter_worker.isRunning()):
+            return
+            
+        # Disable hover preview if a filter is already selected
+        if self.selected_filter is not None:
             return
             
         self.is_hovering = True
@@ -930,10 +1562,8 @@ class FilmFilterGUI(QMainWindow):
         # Check if preview is cached
         if filter_name in self.preview_cache:
             self.display_image(self.preview_cache[filter_name])
-            self.status_label.setText(f"🔍 Previewing {filter_name}")
         else:
             # Generate preview in background
-            self.status_label.setText(f"🔄 Loading preview: {filter_name}...")
             self.generate_preview(filter_name, filter_path)
     
     def on_filter_hover_left(self):
@@ -950,10 +1580,8 @@ class FilmFilterGUI(QMainWindow):
         if not self.is_hovering and self.currently_hovering_filter is None:
             if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
                 self.display_image(self.current_filtered_image)
-                self.status_label.setText("🎨 Showing filtered image")
             elif self.original_image is not None:
                 self.display_image(self.original_image)
-                self.status_label.setText("📷 Showing original image")
     
     def generate_preview(self, filter_name, filter_path):
         """Generate a preview of the filter and cache it."""
@@ -992,24 +1620,50 @@ class FilmFilterGUI(QMainWindow):
         # Display if still hovering over this filter
         if self.is_hovering:
             self.display_image(filtered_image)
-            self.status_label.setText(f"🔍 Previewing {filter_name}")
     
     def show_before(self):
         """Show the original image."""
         if self.original_image is not None:
             self.display_image(self.original_image)
             self.current_display_mode = "original"
-            self.status_label.setText("📷 Showing original image")
     
     def show_after(self):
         """Show the filtered image."""
         if self.current_filtered_image is not None:
             self.display_image(self.current_filtered_image)
             self.current_display_mode = "filtered"
-            self.status_label.setText("🎨 Showing filtered image")
         else:
             # No filter applied yet, show original
             self.show_before()
+    
+    def toggle_comparison(self):
+        """Toggle between original and edited (filtered) image."""
+        if self.original_image is None:
+            return
+            
+        if self.current_display_mode == "original":
+            # Currently showing original, switch to filtered
+            if self.current_filtered_image is not None:
+                self.display_image(self.current_filtered_image)
+                self.current_display_mode = "filtered"
+            else:
+                # No filter applied, stay on original
+                return
+        else:
+            # Currently showing filtered, switch to original
+            self.display_image(self.original_image)
+            self.current_display_mode = "original"
+            
+        # Update button text
+        self.update_toggle_button_text()
+    
+    def update_toggle_button_text(self):
+        """Update the toggle button text based on current display mode."""
+        if hasattr(self, 'toggle_btn'):
+            if self.current_display_mode == "original":
+                self.toggle_btn.setText("Original")
+            else:
+                self.toggle_btn.setText("Edited")
 
 
 def main():

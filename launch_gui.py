@@ -11,7 +11,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 try:
-    from film_filter_gui import main
+    from GUI import main
     main()
 except ImportError as e:
     print("Error: Missing dependencies. Please install required packages:")
