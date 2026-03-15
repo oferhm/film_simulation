@@ -771,16 +771,22 @@ class FilmFilterGUI(QMainWindow):
         self.image_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.image_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.image_scroll.setAlignment(Qt.AlignCenter)
+        
+        # Optimize scroll area for smooth dragging
+        self.image_scroll.horizontalScrollBar().setSingleStep(1)
+        self.image_scroll.verticalScrollBar().setSingleStep(1)
+        self.image_scroll.horizontalScrollBar().setPageStep(20)
+        self.image_scroll.verticalScrollBar().setPageStep(20)
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumSize(800, 500)
+        self.image_label.setMinimumSize(750, 500)  # 3:2 aspect ratio to better fit photos
         self.image_label.setStyleSheet("""
             background-color: transparent;
             color: #888888;
             font-size: 16px;
             font-weight: 500;
         """)
-        self.image_label.setText("🖼️  Import photos")
+        self.image_label.setText("")  # Empty grid at startup
         
         # Enable mouse click events for zoom functionality
         self.image_label.mousePressEvent = self.image_mouse_press
@@ -804,6 +810,19 @@ class FilmFilterGUI(QMainWindow):
             border: none;
         """)
         layout.addWidget(self.image_name_label)
+        
+        # Image metadata label
+        self.image_metadata_label = QLabel("")
+        self.image_metadata_label.setAlignment(Qt.AlignCenter)
+        self.image_metadata_label.setStyleSheet("""
+            background-color: transparent;
+            color: #888888;
+            font-size: 10px;
+            font-weight: 400;
+            padding: 4px;
+            border: none;
+        """)
+        layout.addWidget(self.image_metadata_label)
         
         # Bottom toolbar
         toolbar = QFrame()
@@ -837,9 +856,9 @@ class FilmFilterGUI(QMainWindow):
                 background-color: #4a4a4a;
                 border: 1px solid #666666;
                 color: white;
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 500;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border-radius: 6px;
             }
             #comparisonButton:hover {
@@ -854,6 +873,37 @@ class FilmFilterGUI(QMainWindow):
         layout.addWidget(toolbar)
         
         return panel
+    
+    def update_image_metadata(self, file_path):
+        """Update image name and metadata display on same line."""
+        try:
+            filename = os.path.basename(file_path)
+            if self.original_image is not None:
+                # Get file size in MB
+                file_size_bytes = os.path.getsize(file_path)
+                file_size_mb = file_size_bytes / (1024 * 1024)
+                
+                # Get image dimensions
+                height, width = self.original_image.shape[:2]
+                
+                # Calculate aspect ratio
+                def gcd(a, b):
+                    while b:
+                        a, b = b, a % b
+                    return a
+                
+                ratio_gcd = gcd(width, height)
+                ratio_w = width // ratio_gcd
+                ratio_h = height // ratio_gcd
+                
+                # Format combined string with name and metadata
+                display_text = f"{filename}  •  {width} × {height} pixels  •  {ratio_w}:{ratio_h}  •  {file_size_mb:.1f} MB"
+                self.image_name_label.setText(display_text)
+            else:
+                self.image_name_label.setText(filename)
+        except Exception as e:
+            print(f"Error updating metadata: {e}")
+            self.image_name_label.setText(os.path.basename(file_path))
     
     def update_import_path_label(self):
         """Update the import path label display."""
@@ -1172,14 +1222,19 @@ class FilmFilterGUI(QMainWindow):
                 # Enable toggle button
                 self.toggle_btn.setEnabled(True)
                 
-                # Update image name display
-                self.image_name_label.setText(os.path.basename(file_path))
+                # Update image name and metadata display
+                self.update_image_metadata(file_path)
+                
+                # Update image metadata
+                self.update_image_metadata(file_path)
                 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load image: {str(e)}")
                 # Reset image name on error
                 if hasattr(self, 'image_name_label'):
                     self.image_name_label.setText("No image loaded")
+                if hasattr(self, 'image_metadata_label'):
+                    self.image_metadata_label.setText("")
                 # Reset original filename and zoom state
                 self.original_filename = None
                 self.is_zoomed = False
@@ -1299,11 +1354,11 @@ class FilmFilterGUI(QMainWindow):
             # Start dragging if we moved far enough from start position
             if not self.dragging:
                 move_distance = (event.pos() - self.left_click_start_pos).manhattanLength()
-                if move_distance > 5:  # Start drag after 5 pixel movement
+                if move_distance > 3:  # Reduced threshold for more responsive drag start
                     self.dragging = True
                     self.image_label.setCursor(QCursor(Qt.ClosedHandCursor))
             
-            if self.dragging:
+            if self.dragging and hasattr(self, 'last_pan_point'):
                 # Calculate movement delta
                 delta = event.pos() - self.last_pan_point
                 
@@ -1311,10 +1366,18 @@ class FilmFilterGUI(QMainWindow):
                 h_scroll = self.image_scroll.horizontalScrollBar()
                 v_scroll = self.image_scroll.verticalScrollBar()
                 
-                # Update scroll positions (negative delta for natural movement)
-                h_scroll.setValue(h_scroll.value() - delta.x())
-                v_scroll.setValue(v_scroll.value() - delta.y())
+                # Apply movement with 1:1 ratio for natural feel
+                new_h = h_scroll.value() - delta.x()
+                new_v = v_scroll.value() - delta.y()
                 
+                # Update scroll positions immediately for smooth performance
+                h_scroll.setValue(new_h)
+                v_scroll.setValue(new_v)
+                
+                # Update immediately for smoother visual feedback
+                self.image_scroll.update()
+                
+            # Always update last pan point for next movement
             self.last_pan_point = event.pos()
     
     def image_mouse_release(self, event):
@@ -1455,7 +1518,7 @@ class FilmFilterGUI(QMainWindow):
         # Ensure widget is resizable for fit-to-window mode
         self.image_scroll.setWidgetResizable(True)
         
-        # Scale pixmap to fit the display area while maintaining aspect ratio
+        # Scale pixmap to fit as large as possible while keeping native aspect ratio
         label_size = self.image_label.size()
         scaled_pixmap = pixmap.scaled(label_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         

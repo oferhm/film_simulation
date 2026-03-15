@@ -1,2 +1,2 @@
-import_folder_path = "D:/Photos/אוסף ניקון D7000"
+import_folder_path = "D:/Photos/Save the date - חתונה"
 export_folder_path = "D:/Photos/app_test"
