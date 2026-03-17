@@ -425,11 +425,20 @@ class FilmFilterGUI(QMainWindow):
         self.filters_dir = "film_filters/filters"
         self.available_filters = self.get_available_filters()
         
-        # Initialize exposure adjustment
+        # Initialize all adjustment variables
+        self.temp_adjustment = 0      # Range: -100 to +100
+        self.tint_adjustment = 0      # Range: -100 to +100
         self.exposure_adjustment = 0  # Range: -100 to +100
-        
-        # Initialize shadow adjustment  
-        self.shadow_adjustment = 0  # Range: -100 to +100
+        self.contrast_adjustment = 0  # Range: -100 to +100
+        self.highlights_adjustment = 0  # Range: -100 to +100
+        self.shadow_adjustment = 0    # Range: -100 to +100
+        self.whites_adjustment = 0    # Range: -100 to +100
+        self.blacks_adjustment = 0    # Range: -100 to +100
+        self.texture_adjustment = 0   # Range: -100 to +100
+        self.clarity_adjustment = 0   # Range: -100 to +100
+        self.dehaze_adjustment = 0    # Range: -100 to +100
+        self.vibrance_adjustment = 0  # Range: -100 to +100
+        self.saturation_adjustment = 0  # Range: -100 to +100
         
         self.init_ui()
         
@@ -459,11 +468,11 @@ class FilmFilterGUI(QMainWindow):
         
         # Left side - Image display (takes most space)
         image_panel = self.create_image_panel()
-        content_layout.addWidget(image_panel, 3)  # 75% of space
+        content_layout.addWidget(image_panel, 4)  # 80% of space
         
-        # Right side - Controls panel
+        # Right side - Controls panel  
         controls_panel = self.create_controls_panel()
-        content_layout.addWidget(controls_panel, 1)  # 25% of space
+        content_layout.addWidget(controls_panel, 1)  # 20% of space
         
         main_layout.addLayout(content_layout)
         
@@ -964,13 +973,159 @@ class FilmFilterGUI(QMainWindow):
         """)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setSpacing(4)
+        
+        # Temperature Control Section
+        temp_frame = QFrame()
+        temp_frame.setStyleSheet("border: none; background: transparent;")
+        temp_layout = QHBoxLayout(temp_frame)
+        temp_layout.setContentsMargins(0, 4, 0, 0)
+        temp_layout.setSpacing(12)
+        
+        temp_label = QLabel("Temp")
+        temp_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        temp_label.setFixedWidth(70)
+        temp_layout.addWidget(temp_label)
+        
+        self.temp_slider = QSlider(Qt.Horizontal)
+        self.temp_slider.setMinimum(-100)
+        self.temp_slider.setMaximum(100)
+        self.temp_slider.setValue(0)
+        self.temp_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.temp_slider.setTracking(True)
+        self.temp_slider.valueChanged.connect(self.on_temp_changed_smooth)
+        self.temp_slider.mouseDoubleClickEvent = self.reset_temp_on_double_click
+        self.temp_slider.setEnabled(False)
+        
+        self.temp_update_timer = QTimer()
+        self.temp_update_timer.setSingleShot(True)
+        self.temp_update_timer.timeout.connect(self.apply_temp_update)
+        self.temp_update_delay = 50
+        temp_layout.addWidget(self.temp_slider)
+        
+        self.temp_value_label = QLabel("0")
+        self.temp_value_label.setAlignment(Qt.AlignCenter)
+        self.temp_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.temp_value_label.setFixedWidth(30)
+        temp_layout.addWidget(self.temp_value_label)
+        
+        layout.addWidget(temp_frame)
+        
+        # Tint Control Section
+        tint_frame = QFrame()
+        tint_frame.setStyleSheet("border: none; background: transparent;")
+        tint_layout = QHBoxLayout(tint_frame)
+        tint_layout.setContentsMargins(0, 4, 0, 0)
+        tint_layout.setSpacing(12)
+        
+        tint_label = QLabel("Tint")
+        tint_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        tint_label.setFixedWidth(70)
+        tint_layout.addWidget(tint_label)
+        
+        self.tint_slider = QSlider(Qt.Horizontal)
+        self.tint_slider.setMinimum(-100)
+        self.tint_slider.setMaximum(100)
+        self.tint_slider.setValue(0)
+        self.tint_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.tint_slider.setTracking(True)
+        self.tint_slider.valueChanged.connect(self.on_tint_changed_smooth)
+        self.tint_slider.mouseDoubleClickEvent = self.reset_tint_on_double_click
+        self.tint_slider.setEnabled(False)
+        
+        self.tint_update_timer = QTimer()
+        self.tint_update_timer.setSingleShot(True)
+        self.tint_update_timer.timeout.connect(self.apply_tint_update)
+        self.tint_update_delay = 50
+        tint_layout.addWidget(self.tint_slider)
+        
+        self.tint_value_label = QLabel("0")
+        self.tint_value_label.setAlignment(Qt.AlignCenter)
+        self.tint_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.tint_value_label.setFixedWidth(30)
+        tint_layout.addWidget(self.tint_value_label)
+        
+        layout.addWidget(tint_frame)
         
         # Exposure Control Section
         exposure_frame = QFrame()
         exposure_frame.setStyleSheet("border: none; background: transparent;")
         exposure_layout = QHBoxLayout(exposure_frame)
-        exposure_layout.setContentsMargins(0, 16, 0, 0)
+        exposure_layout.setContentsMargins(0, 4, 0, 0)
         exposure_layout.setSpacing(12)
         
         # Exposure label on the left
@@ -991,38 +1146,32 @@ class FilmFilterGUI(QMainWindow):
         self.exposure_slider.setMaximum(100)
         self.exposure_slider.setValue(0)  # Start in middle
         
-        # Enhanced smooth slider styling
+        # Clean minimalist slider styling
         self.exposure_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                border: 1px solid #555555;
-                height: 4px;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 #2a2a2a, stop:0.5 #3a3a3a, stop:1 #2a2a2a);
-                border-radius: 2px;
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
             }
             QSlider::handle:horizontal {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #888888, stop:0.5 #666666, stop:1 #444444);
-                border: 2px solid #999999;
-                width: 20px;
-                height: 24px;
-                margin: -10px 0;
-                border-radius: 12px;
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
             }
             QSlider::handle:horizontal:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #aaaaaa, stop:0.5 #888888, stop:1 #666666);
-                border-color: #bbbbbb;
+                border-color: #666666;
             }
             QSlider::handle:horizontal:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #0078d4, stop:0.5 #106ebe, stop:1 #005a9e);
-                border-color: #0078d4;
+                background: #f0f0f0;
+                border-color: #333333;
             }
             QSlider::sub-page:horizontal {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 #0078d4, stop:1 #106ebe);
-                border-radius: 3px;
+                background: #999999;
+                border-radius: 1px;
             }
         """)
         
@@ -1053,11 +1202,157 @@ class FilmFilterGUI(QMainWindow):
         
         layout.addWidget(exposure_frame)
         
+        # Contrast Control Section
+        contrast_frame = QFrame()
+        contrast_frame.setStyleSheet("border: none; background: transparent;")
+        contrast_layout = QHBoxLayout(contrast_frame)
+        contrast_layout.setContentsMargins(0, 4, 0, 0)
+        contrast_layout.setSpacing(12)
+        
+        contrast_label = QLabel("Contrast")
+        contrast_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        contrast_label.setFixedWidth(70)
+        contrast_layout.addWidget(contrast_label)
+        
+        self.contrast_slider = QSlider(Qt.Horizontal)
+        self.contrast_slider.setMinimum(-100)
+        self.contrast_slider.setMaximum(100)
+        self.contrast_slider.setValue(0)
+        self.contrast_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.contrast_slider.setTracking(True)
+        self.contrast_slider.valueChanged.connect(self.on_contrast_changed_smooth)
+        self.contrast_slider.mouseDoubleClickEvent = self.reset_contrast_on_double_click
+        self.contrast_slider.setEnabled(False)
+        
+        self.contrast_update_timer = QTimer()
+        self.contrast_update_timer.setSingleShot(True)
+        self.contrast_update_timer.timeout.connect(self.apply_contrast_update)
+        self.contrast_update_delay = 50
+        contrast_layout.addWidget(self.contrast_slider)
+        
+        self.contrast_value_label = QLabel("0")
+        self.contrast_value_label.setAlignment(Qt.AlignCenter)
+        self.contrast_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.contrast_value_label.setFixedWidth(30)
+        contrast_layout.addWidget(self.contrast_value_label)
+        
+        layout.addWidget(contrast_frame)
+        
+        # Highlights Control Section
+        highlights_frame = QFrame()
+        highlights_frame.setStyleSheet("border: none; background: transparent;")
+        highlights_layout = QHBoxLayout(highlights_frame)
+        highlights_layout.setContentsMargins(0, 4, 0, 0)
+        highlights_layout.setSpacing(12)
+        
+        highlights_label = QLabel("Highlights")
+        highlights_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        highlights_label.setFixedWidth(70)
+        highlights_layout.addWidget(highlights_label)
+        
+        self.highlights_slider = QSlider(Qt.Horizontal)
+        self.highlights_slider.setMinimum(-100)
+        self.highlights_slider.setMaximum(100)
+        self.highlights_slider.setValue(0)
+        self.highlights_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.highlights_slider.setTracking(True)
+        self.highlights_slider.valueChanged.connect(self.on_highlights_changed_smooth)
+        self.highlights_slider.mouseDoubleClickEvent = self.reset_highlights_on_double_click
+        self.highlights_slider.setEnabled(False)
+        
+        self.highlights_update_timer = QTimer()
+        self.highlights_update_timer.setSingleShot(True)
+        self.highlights_update_timer.timeout.connect(self.apply_highlights_update)
+        self.highlights_update_delay = 50
+        highlights_layout.addWidget(self.highlights_slider)
+        
+        self.highlights_value_label = QLabel("0")
+        self.highlights_value_label.setAlignment(Qt.AlignCenter)
+        self.highlights_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.highlights_value_label.setFixedWidth(30)
+        highlights_layout.addWidget(self.highlights_value_label)
+        
+        layout.addWidget(highlights_frame)
+        
         # Shadow Control Section
         shadow_frame = QFrame()
         shadow_frame.setStyleSheet("border: none; background: transparent;")
         shadow_layout = QHBoxLayout(shadow_frame)
-        shadow_layout.setContentsMargins(0, 16, 0, 0)
+        shadow_layout.setContentsMargins(0, 4, 0, 0)
         shadow_layout.setSpacing(12)
         
         # Shadow label on the left
@@ -1078,38 +1373,32 @@ class FilmFilterGUI(QMainWindow):
         self.shadow_slider.setMaximum(100)
         self.shadow_slider.setValue(0)  # Start in middle
         
-        # Enhanced smooth slider styling (same as exposure)
+        # Clean minimalist slider styling
         self.shadow_slider.setStyleSheet("""
             QSlider::groove:horizontal {
-                border: 1px solid #555555;
-                height: 4px;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 #2a2a2a, stop:0.5 #3a3a3a, stop:1 #2a2a2a);
-                border-radius: 2px;
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
             }
             QSlider::handle:horizontal {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #888888, stop:0.5 #666666, stop:1 #444444);
-                border: 2px solid #999999;
-                width: 20px;
-                height: 24px;
-                margin: -10px 0;
-                border-radius: 12px;
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
             }
             QSlider::handle:horizontal:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #aaaaaa, stop:0.5 #888888, stop:1 #666666);
-                border-color: #bbbbbb;
+                border-color: #666666;
             }
             QSlider::handle:horizontal:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-                    stop:0 #0078d4, stop:0.5 #106ebe, stop:1 #005a9e);
-                border-color: #0078d4;
+                background: #f0f0f0;
+                border-color: #333333;
             }
             QSlider::sub-page:horizontal {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 #0078d4, stop:1 #106ebe);
-                border-radius: 3px;
+                background: #999999;
+                border-radius: 1px;
             }
         """)
         
@@ -1139,6 +1428,517 @@ class FilmFilterGUI(QMainWindow):
         shadow_layout.addWidget(self.shadow_value_label)
         
         layout.addWidget(shadow_frame)
+        
+        # Whites Control Section
+        whites_frame = QFrame()
+        whites_frame.setStyleSheet("border: none; background: transparent;")
+        whites_layout = QHBoxLayout(whites_frame)
+        whites_layout.setContentsMargins(0, 4, 0, 0)
+        whites_layout.setSpacing(12)
+        
+        whites_label = QLabel("Whites")
+        whites_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        whites_label.setFixedWidth(70)
+        whites_layout.addWidget(whites_label)
+        
+        self.whites_slider = QSlider(Qt.Horizontal)
+        self.whites_slider.setMinimum(-100)
+        self.whites_slider.setMaximum(100)
+        self.whites_slider.setValue(0)
+        self.whites_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.whites_slider.setTracking(True)
+        self.whites_slider.valueChanged.connect(self.on_whites_changed_smooth)
+        self.whites_slider.mouseDoubleClickEvent = self.reset_whites_on_double_click
+        self.whites_slider.setEnabled(False)
+        
+        self.whites_update_timer = QTimer()
+        self.whites_update_timer.setSingleShot(True)
+        self.whites_update_timer.timeout.connect(self.apply_whites_update)
+        self.whites_update_delay = 50
+        whites_layout.addWidget(self.whites_slider)
+        
+        self.whites_value_label = QLabel("0")
+        self.whites_value_label.setAlignment(Qt.AlignCenter)
+        self.whites_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.whites_value_label.setFixedWidth(30)
+        whites_layout.addWidget(self.whites_value_label)
+        
+        layout.addWidget(whites_frame)
+        
+        # Blacks Control Section
+        blacks_frame = QFrame()
+        blacks_frame.setStyleSheet("border: none; background: transparent;")
+        blacks_layout = QHBoxLayout(blacks_frame)
+        blacks_layout.setContentsMargins(0, 4, 0, 0)
+        blacks_layout.setSpacing(12)
+        
+        blacks_label = QLabel("Blacks")
+        blacks_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        blacks_label.setFixedWidth(70)
+        blacks_layout.addWidget(blacks_label)
+        
+        self.blacks_slider = QSlider(Qt.Horizontal)
+        self.blacks_slider.setMinimum(-100)
+        self.blacks_slider.setMaximum(100)
+        self.blacks_slider.setValue(0)
+        self.blacks_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.blacks_slider.setTracking(True)
+        self.blacks_slider.valueChanged.connect(self.on_blacks_changed_smooth)
+        self.blacks_slider.mouseDoubleClickEvent = self.reset_blacks_on_double_click
+        self.blacks_slider.setEnabled(False)
+        
+        self.blacks_update_timer = QTimer()
+        self.blacks_update_timer.setSingleShot(True)
+        self.blacks_update_timer.timeout.connect(self.apply_blacks_update)
+        self.blacks_update_delay = 50
+        blacks_layout.addWidget(self.blacks_slider)
+        
+        self.blacks_value_label = QLabel("0")
+        self.blacks_value_label.setAlignment(Qt.AlignCenter)
+        self.blacks_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.blacks_value_label.setFixedWidth(30)
+        blacks_layout.addWidget(self.blacks_value_label)
+        
+        layout.addWidget(blacks_frame)
+        
+        # Texture Control Section
+        texture_frame = QFrame()
+        texture_frame.setStyleSheet("border: none; background: transparent;")
+        texture_layout = QHBoxLayout(texture_frame)
+        texture_layout.setContentsMargins(0, 4, 0, 0)
+        texture_layout.setSpacing(12)
+        
+        texture_label = QLabel("Texture")
+        texture_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        texture_label.setFixedWidth(70)
+        texture_layout.addWidget(texture_label)
+        
+        self.texture_slider = QSlider(Qt.Horizontal)
+        self.texture_slider.setMinimum(-100)
+        self.texture_slider.setMaximum(100)
+        self.texture_slider.setValue(0)
+        self.texture_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.texture_slider.setTracking(True)
+        self.texture_slider.valueChanged.connect(self.on_texture_changed_smooth)
+        self.texture_slider.mouseDoubleClickEvent = self.reset_texture_on_double_click
+        self.texture_slider.setEnabled(False)
+        
+        self.texture_update_timer = QTimer()
+        self.texture_update_timer.setSingleShot(True)
+        self.texture_update_timer.timeout.connect(self.apply_texture_update)
+        self.texture_update_delay = 50
+        texture_layout.addWidget(self.texture_slider)
+        
+        self.texture_value_label = QLabel("0")
+        self.texture_value_label.setAlignment(Qt.AlignCenter)
+        self.texture_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.texture_value_label.setFixedWidth(30)
+        texture_layout.addWidget(self.texture_value_label)
+        
+        layout.addWidget(texture_frame)
+        
+        # Clarity Control Section
+        clarity_frame = QFrame()
+        clarity_frame.setStyleSheet("border: none; background: transparent;")
+        clarity_layout = QHBoxLayout(clarity_frame)
+        clarity_layout.setContentsMargins(0, 4, 0, 0)
+        clarity_layout.setSpacing(12)
+        
+        clarity_label = QLabel("Clarity")
+        clarity_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        clarity_label.setFixedWidth(70)
+        clarity_layout.addWidget(clarity_label)
+        
+        self.clarity_slider = QSlider(Qt.Horizontal)
+        self.clarity_slider.setMinimum(-100)
+        self.clarity_slider.setMaximum(100)
+        self.clarity_slider.setValue(0)
+        self.clarity_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.clarity_slider.setTracking(True)
+        self.clarity_slider.valueChanged.connect(self.on_clarity_changed_smooth)
+        self.clarity_slider.mouseDoubleClickEvent = self.reset_clarity_on_double_click
+        self.clarity_slider.setEnabled(False)
+        
+        self.clarity_update_timer = QTimer()
+        self.clarity_update_timer.setSingleShot(True)
+        self.clarity_update_timer.timeout.connect(self.apply_clarity_update)
+        self.clarity_update_delay = 50
+        clarity_layout.addWidget(self.clarity_slider)
+        
+        self.clarity_value_label = QLabel("0")
+        self.clarity_value_label.setAlignment(Qt.AlignCenter)
+        self.clarity_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.clarity_value_label.setFixedWidth(30)
+        clarity_layout.addWidget(self.clarity_value_label)
+        
+        layout.addWidget(clarity_frame)
+        
+        # Dehaze Control Section
+        dehaze_frame = QFrame()
+        dehaze_frame.setStyleSheet("border: none; background: transparent;")
+        dehaze_layout = QHBoxLayout(dehaze_frame)
+        dehaze_layout.setContentsMargins(0, 4, 0, 0)
+        dehaze_layout.setSpacing(12)
+        
+        dehaze_label = QLabel("Dehaze")
+        dehaze_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        dehaze_label.setFixedWidth(70)
+        dehaze_layout.addWidget(dehaze_label)
+        
+        self.dehaze_slider = QSlider(Qt.Horizontal)
+        self.dehaze_slider.setMinimum(-100)
+        self.dehaze_slider.setMaximum(100)
+        self.dehaze_slider.setValue(0)
+        self.dehaze_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.dehaze_slider.setTracking(True)
+        self.dehaze_slider.valueChanged.connect(self.on_dehaze_changed_smooth)
+        self.dehaze_slider.mouseDoubleClickEvent = self.reset_dehaze_on_double_click
+        self.dehaze_slider.setEnabled(False)
+        
+        self.dehaze_update_timer = QTimer()
+        self.dehaze_update_timer.setSingleShot(True)
+        self.dehaze_update_timer.timeout.connect(self.apply_dehaze_update)
+        self.dehaze_update_delay = 50
+        dehaze_layout.addWidget(self.dehaze_slider)
+        
+        self.dehaze_value_label = QLabel("0")
+        self.dehaze_value_label.setAlignment(Qt.AlignCenter)
+        self.dehaze_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.dehaze_value_label.setFixedWidth(30)
+        dehaze_layout.addWidget(self.dehaze_value_label)
+        
+        layout.addWidget(dehaze_frame)
+        
+        # Vibrance Control Section
+        vibrance_frame = QFrame()
+        vibrance_frame.setStyleSheet("border: none; background: transparent;")
+        vibrance_layout = QHBoxLayout(vibrance_frame)
+        vibrance_layout.setContentsMargins(0, 4, 0, 0)
+        vibrance_layout.setSpacing(12)
+        
+        vibrance_label = QLabel("Vibrance")
+        vibrance_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        vibrance_label.setFixedWidth(70)
+        vibrance_layout.addWidget(vibrance_label)
+        
+        self.vibrance_slider = QSlider(Qt.Horizontal)
+        self.vibrance_slider.setMinimum(-100)
+        self.vibrance_slider.setMaximum(100)
+        self.vibrance_slider.setValue(0)
+        self.vibrance_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.vibrance_slider.setTracking(True)
+        self.vibrance_slider.valueChanged.connect(self.on_vibrance_changed_smooth)
+        self.vibrance_slider.mouseDoubleClickEvent = self.reset_vibrance_on_double_click
+        self.vibrance_slider.setEnabled(False)
+        
+        self.vibrance_update_timer = QTimer()
+        self.vibrance_update_timer.setSingleShot(True)
+        self.vibrance_update_timer.timeout.connect(self.apply_vibrance_update)
+        self.vibrance_update_delay = 50
+        vibrance_layout.addWidget(self.vibrance_slider)
+        
+        self.vibrance_value_label = QLabel("0")
+        self.vibrance_value_label.setAlignment(Qt.AlignCenter)
+        self.vibrance_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.vibrance_value_label.setFixedWidth(30)
+        vibrance_layout.addWidget(self.vibrance_value_label)
+        
+        layout.addWidget(vibrance_frame)
+        
+        # Saturation Control Section
+        saturation_frame = QFrame()
+        saturation_frame.setStyleSheet("border: none; background: transparent;")
+        saturation_layout = QHBoxLayout(saturation_frame)
+        saturation_layout.setContentsMargins(0, 4, 0, 0)
+        saturation_layout.setSpacing(12)
+        
+        saturation_label = QLabel("Saturation")
+        saturation_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        saturation_label.setFixedWidth(70)
+        saturation_layout.addWidget(saturation_label)
+        
+        self.saturation_slider = QSlider(Qt.Horizontal)
+        self.saturation_slider.setMinimum(-100)
+        self.saturation_slider.setMaximum(100)
+        self.saturation_slider.setValue(0)
+        self.saturation_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: none;
+                height: 2px;
+                background: #cccccc;
+                border-radius: 1px;
+            }
+            QSlider::handle:horizontal {
+                background: #ffffff;
+                border: 1px solid #999999;
+                width: 12px;
+                height: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+            }
+            QSlider::handle:horizontal:hover {
+                border-color: #666666;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: #f0f0f0;
+                border-color: #333333;
+            }
+            QSlider::sub-page:horizontal {
+                background: #999999;
+                border-radius: 1px;
+            }
+        """)
+        self.saturation_slider.setTracking(True)
+        self.saturation_slider.valueChanged.connect(self.on_saturation_changed_smooth)
+        self.saturation_slider.mouseDoubleClickEvent = self.reset_saturation_on_double_click
+        self.saturation_slider.setEnabled(False)
+        
+        self.saturation_update_timer = QTimer()
+        self.saturation_update_timer.setSingleShot(True)
+        self.saturation_update_timer.timeout.connect(self.apply_saturation_update)
+        self.saturation_update_delay = 50
+        saturation_layout.addWidget(self.saturation_slider)
+        
+        self.saturation_value_label = QLabel("0")
+        self.saturation_value_label.setAlignment(Qt.AlignCenter)
+        self.saturation_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.saturation_value_label.setFixedWidth(30)
+        saturation_layout.addWidget(self.saturation_value_label)
+        
+        layout.addWidget(saturation_frame)
         
         # Collapsible Filter Section
         filter_group = QGroupBox("Filters")
@@ -1237,6 +2037,61 @@ class FilmFilterGUI(QMainWindow):
         
         return panel
     
+    def reset_temp_on_double_click(self, event):
+        """Reset temp slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.temp_slider.setValue(0)
+    
+    def reset_tint_on_double_click(self, event):
+        """Reset tint slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.tint_slider.setValue(0)
+    
+    def reset_contrast_on_double_click(self, event):
+        """Reset contrast slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.contrast_slider.setValue(0)
+    
+    def reset_highlights_on_double_click(self, event):
+        """Reset highlights slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.highlights_slider.setValue(0)
+    
+    def reset_whites_on_double_click(self, event):
+        """Reset whites slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.whites_slider.setValue(0)
+    
+    def reset_blacks_on_double_click(self, event):
+        """Reset blacks slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.blacks_slider.setValue(0)
+    
+    def reset_texture_on_double_click(self, event):
+        """Reset texture slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.texture_slider.setValue(0)
+    
+    def reset_clarity_on_double_click(self, event):
+        """Reset clarity slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.clarity_slider.setValue(0)
+    
+    def reset_dehaze_on_double_click(self, event):
+        """Reset dehaze slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.dehaze_slider.setValue(0)
+    
+    def reset_vibrance_on_double_click(self, event):
+        """Reset vibrance slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.vibrance_slider.setValue(0)
+    
+    def reset_saturation_on_double_click(self, event):
+        """Reset saturation slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.saturation_slider.setValue(0)
+    
     def reset_shadow_on_double_click(self, event):
         """Reset shadow slider to 0 on double click."""
         if event.button() == Qt.LeftButton:
@@ -1246,6 +2101,358 @@ class FilmFilterGUI(QMainWindow):
         """Reset exposure slider to 0 on double click."""
         if event.button() == Qt.LeftButton:
             self.exposure_slider.setValue(0)
+    
+    def apply_temp_to_image(self, image, temp_value):
+        """Apply temperature adjustment to an image and return the adjusted image."""
+        if temp_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32)
+            
+            # Temperature adjustment affects the blue/red balance
+            # Positive values make the image warmer (more red/yellow)
+            # Negative values make the image cooler (more blue)
+            factor = temp_value / 100.0
+            
+            if len(img_float.shape) == 3:
+                if factor > 0:  # Warmer
+                    img_float[:,:,2] *= (1 + factor * 0.3)  # Increase red
+                    img_float[:,:,0] *= (1 - factor * 0.2)  # Decrease blue
+                else:  # Cooler
+                    img_float[:,:,0] *= (1 - factor * 0.3)  # Increase blue
+                    img_float[:,:,2] *= (1 + factor * 0.2)  # Decrease red
+            
+            # Clip values to valid range and convert back to uint8
+            adjusted_image = np.clip(img_float, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying temperature adjustment: {e}")
+            return image
+    
+    def apply_tint_to_image(self, image, tint_value):
+        """Apply tint adjustment to an image and return the adjusted image."""
+        if tint_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32)
+            
+            # Tint adjustment affects the magenta/green balance
+            # Positive values add magenta (more red+blue, less green)
+            # Negative values add green (less red+blue, more green)
+            factor = tint_value / 100.0
+            
+            if len(img_float.shape) == 3:
+                if factor > 0:  # More magenta
+                    img_float[:,:,1] *= (1 - factor * 0.2)  # Decrease green
+                    img_float[:,:,2] *= (1 + factor * 0.15)  # Increase red
+                    img_float[:,:,0] *= (1 + factor * 0.15)  # Increase blue
+                else:  # More green
+                    img_float[:,:,1] *= (1 - factor * 0.2)  # Increase green
+                    img_float[:,:,2] *= (1 + factor * 0.1)  # Decrease red
+                    img_float[:,:,0] *= (1 + factor * 0.1)  # Decrease blue
+            
+            # Clip values to valid range and convert back to uint8
+            adjusted_image = np.clip(img_float, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying tint adjustment: {e}")
+            return image
+    
+    def apply_contrast_to_image(self, image, contrast_value):
+        """Apply contrast adjustment to an image and return the adjusted image."""
+        if contrast_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing in range [0, 1]
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Convert contrast value (-100 to +100) to contrast factor
+            # Positive values increase contrast, negative values decrease it
+            factor = 1.0 + (contrast_value / 100.0)
+            
+            # Apply contrast adjustment around midpoint (0.5)
+            adjusted_image = 0.5 + factor * (img_float - 0.5)
+            
+            # Clip values to valid range and convert back to uint8
+            adjusted_image = np.clip(adjusted_image * 255, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying contrast adjustment: {e}")
+            return image
+    
+    def apply_highlights_to_image(self, image, highlights_value):
+        """Apply highlights adjustment to an image and return the adjusted image."""
+        if highlights_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Calculate highlights mask (brighter areas)
+            if len(img_float.shape) == 3:
+                luminance = 0.299 * img_float[:,:,2] + 0.587 * img_float[:,:,1] + 0.114 * img_float[:,:,0]
+            else:
+                luminance = img_float
+            
+            # Create highlights mask: highlights are areas with high luminance
+            highlights_mask = np.clip(luminance ** 0.5, 0, 1)  # Square root for better falloff
+            
+            # Convert highlights value (-100 to +100) to adjustment factor
+            factor = highlights_value / 100.0
+            
+            # Apply highlights adjustment
+            if len(img_float.shape) == 3:
+                for channel in range(3):
+                    adjustment = factor * highlights_mask
+                    img_float[:,:,channel] = np.clip(img_float[:,:,channel] + adjustment, 0, 1)
+            else:
+                adjustment = factor * highlights_mask
+                img_float = np.clip(img_float + adjustment, 0, 1)
+            
+            # Convert back to uint8
+            adjusted_image = np.clip(img_float * 255, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying highlights adjustment: {e}")
+            return image
+    
+    def apply_whites_to_image(self, image, whites_value):
+        """Apply whites adjustment to an image and return the adjusted image."""
+        if whites_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Whites adjustment affects the white point
+            # Create a mask for the brightest areas
+            if len(img_float.shape) == 3:
+                luminance = 0.299 * img_float[:,:,2] + 0.587 * img_float[:,:,1] + 0.114 * img_float[:,:,0]
+            else:
+                luminance = img_float
+            
+            # Create whites mask: affects only the brightest pixels
+            whites_mask = np.clip((luminance - 0.7) / 0.3, 0, 1)  # Only affect top 30% of luminance
+            
+            # Convert whites value to adjustment factor
+            factor = whites_value / 100.0
+            
+            # Apply whites adjustment
+            if len(img_float.shape) == 3:
+                for channel in range(3):
+                    adjustment = factor * whites_mask * 0.5
+                    img_float[:,:,channel] = np.clip(img_float[:,:,channel] + adjustment, 0, 1)
+            else:
+                adjustment = factor * whites_mask * 0.5
+                img_float = np.clip(img_float + adjustment, 0, 1)
+            
+            # Convert back to uint8
+            adjusted_image = np.clip(img_float * 255, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying whites adjustment: {e}")
+            return image
+    
+    def apply_blacks_to_image(self, image, blacks_value):
+        """Apply blacks adjustment to an image and return the adjusted image."""
+        if blacks_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Blacks adjustment affects the black point
+            # Create a mask for the darkest areas
+            if len(img_float.shape) == 3:
+                luminance = 0.299 * img_float[:,:,2] + 0.587 * img_float[:,:,1] + 0.114 * img_float[:,:,0]
+            else:
+                luminance = img_float
+            
+            # Create blacks mask: affects only the darkest pixels
+            blacks_mask = np.clip((0.3 - luminance) / 0.3, 0, 1)  # Only affect bottom 30% of luminance
+            
+            # Convert blacks value to adjustment factor
+            factor = blacks_value / 100.0
+            
+            # Apply blacks adjustment
+            if len(img_float.shape) == 3:
+                for channel in range(3):
+                    adjustment = factor * blacks_mask * 0.3
+                    img_float[:,:,channel] = np.clip(img_float[:,:,channel] + adjustment, 0, 1)
+            else:
+                adjustment = factor * blacks_mask * 0.3
+                img_float = np.clip(img_float + adjustment, 0, 1)
+            
+            # Convert back to uint8
+            adjusted_image = np.clip(img_float * 255, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying blacks adjustment: {e}")
+            return image
+    
+    def apply_texture_to_image(self, image, texture_value):
+        """Apply texture adjustment to an image and return the adjusted image.
+        
+        🧵 Texture (fine detail contrast)
+        - Affects small details only (skin pores, fabric, hair, grain)  
+        - Subtle and more "natural" looking
+        - Doesn't mess much with overall contrast or tones
+        - Positive values enhance micro-details, negative values smooth them (great for skin)
+        """
+        if texture_value == 0:
+            return image
+        
+        try:
+            # Texture enhancement/smoothing using fine detail unsharp masking
+            img_float = image.astype(np.float32)
+            
+            # Use appropriate radius for fine details (not too small to be invisible)
+            sigma = 1.2  # Increased from 0.7 for more visible fine detail
+            blurred = cv2.GaussianBlur(img_float, (0, 0), sigma)
+            
+            # Calculate fine detail information
+            fine_details = img_float - blurred
+            
+            # Convert texture value to enhancement/smoothing factor  
+            factor = texture_value / 100.0
+            
+            # Apply texture adjustment with more visible but still natural effect
+            # Positive enhances fine texture, negative smooths (great for skin smoothing)
+            strength = 0.6  # Increased from 0.25 for more noticeable effect
+            adjusted_image = img_float + factor * fine_details * strength
+            
+            # Clip values to valid range and convert back to uint8
+            adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying texture adjustment: {e}")
+            return image
+    
+    def apply_clarity_to_image(self, image, clarity_value):
+        """Apply clarity adjustment to an image and return the adjusted image."""
+        if clarity_value == 0:
+            return image
+        
+        try:
+            # Clarity enhances mid-tone contrast using unsharp masking
+            img_float = image.astype(np.float32)
+            
+            # Apply larger radius blur for mid-tone contrast
+            sigma = 3.0
+            blurred = cv2.GaussianBlur(img_float, (0, 0), sigma)
+            
+            # Calculate mid-tone details
+            details = img_float - blurred
+            
+            # Convert clarity value to enhancement factor
+            factor = clarity_value / 100.0
+            
+            # Apply clarity enhancement
+            adjusted_image = img_float + factor * details * 0.3
+            
+            # Clip values to valid range and convert back to uint8
+            adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying clarity adjustment: {e}")
+            return image
+    
+    def apply_dehaze_to_image(self, image, dehaze_value):
+        """Apply dehaze adjustment to an image and return the adjusted image."""
+        if dehaze_value == 0:
+            return image
+        
+        try:
+            # Dehaze increases contrast and saturation, particularly in low-contrast areas
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Calculate local contrast
+            gray = cv2.cvtColor((img_float * 255).astype(np.uint8), cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+            blurred = cv2.GaussianBlur(gray, (15, 15), 5.0)
+            local_contrast = np.abs(gray - blurred)
+            
+            # Create dehaze mask (areas with low local contrast need more enhancement)
+            dehaze_mask = 1.0 - np.clip(local_contrast * 3, 0, 1)
+            
+            # Convert dehaze value to enhancement factor
+            factor = dehaze_value / 100.0
+            
+            # Apply dehaze enhancement
+            if len(img_float.shape) == 3:
+                for channel in range(3):
+                    # Increase contrast in hazy areas
+                    contrast_enhancement = 0.5 + (img_float[:,:,channel] - 0.5) * (1 + factor * dehaze_mask * 0.5)
+                    img_float[:,:,channel] = np.clip(contrast_enhancement, 0, 1)
+            
+            # Convert back to uint8
+            adjusted_image = np.clip(img_float * 255, 0, 255).astype(np.uint8)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying dehaze adjustment: {e}")
+            return image
+    
+    def apply_vibrance_to_image(self, image, vibrance_value):
+        """Apply vibrance adjustment to an image and return the adjusted image."""
+        if vibrance_value == 0:
+            return image
+        
+        try:
+            # Vibrance selectively increases saturation of less-saturated colors
+            img_float = image.astype(np.float32)
+            
+            # Convert BGR to HSV for saturation manipulation
+            hsv = cv2.cvtColor(img_float.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
+            
+            # Calculate current saturation (0-255 range in HSV)
+            current_sat = hsv[:,:,1]
+            
+            # Create vibrance mask: affects less-saturated areas more
+            vibrance_mask = 1.0 - (current_sat / 255.0)
+            
+            # Convert vibrance value to adjustment factor
+            factor = vibrance_value / 100.0
+            
+            # Apply vibrance adjustment to saturation channel
+            new_sat = current_sat + factor * vibrance_mask * 50
+            hsv[:,:,1] = np.clip(new_sat, 0, 255)
+            
+            # Convert back to BGR
+            adjusted_image = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying vibrance adjustment: {e}")
+            return image
+    
+    def apply_saturation_to_image(self, image, saturation_value):
+        """Apply saturation adjustment to an image and return the adjusted image."""
+        if saturation_value == 0:
+            return image
+        
+        try:
+            # Convert BGR to HSV for saturation manipulation
+            img_float = image.astype(np.float32)
+            hsv = cv2.cvtColor(img_float.astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
+            
+            # Convert saturation value to multiplier
+            factor = 1.0 + (saturation_value / 100.0)
+            
+            # Apply saturation adjustment to saturation channel
+            hsv[:,:,1] = np.clip(hsv[:,:,1] * factor, 0, 255)
+            
+            # Convert back to BGR
+            adjusted_image = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying saturation adjustment: {e}")
+            return image
     
     def apply_shadow_to_image(self, image, shadow_value):
         """Apply shadow adjustment to an image and return the adjusted image."""
@@ -1307,6 +2514,259 @@ class FilmFilterGUI(QMainWindow):
             print(f"Error applying exposure: {e}")
             return image
     
+    def on_temp_changed_smooth(self, value):
+        """Handle temperature slider changes with smooth debounced updates."""
+        self.temp_adjustment = value
+        self.temp_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.temp_update_timer.stop()
+            self.temp_update_timer.start(self.temp_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_temp_update(self):
+        """Apply the temperature update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_tint_changed_smooth(self, value):
+        """Handle tint slider changes with smooth debounced updates."""
+        self.tint_adjustment = value
+        self.tint_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.tint_update_timer.stop()
+            self.tint_update_timer.start(self.tint_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_tint_update(self):
+        """Apply the tint update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_contrast_changed_smooth(self, value):
+        """Handle contrast slider changes with smooth debounced updates."""
+        self.contrast_adjustment = value
+        self.contrast_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.contrast_update_timer.stop()
+            self.contrast_update_timer.start(self.contrast_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_contrast_update(self):
+        """Apply the contrast update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_highlights_changed_smooth(self, value):
+        """Handle highlights slider changes with smooth debounced updates."""
+        self.highlights_adjustment = value
+        self.highlights_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.highlights_update_timer.stop()
+            self.highlights_update_timer.start(self.highlights_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_highlights_update(self):
+        """Apply the highlights update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_whites_changed_smooth(self, value):
+        """Handle whites slider changes with smooth debounced updates."""
+        self.whites_adjustment = value
+        self.whites_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.whites_update_timer.stop()
+            self.whites_update_timer.start(self.whites_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_whites_update(self):
+        """Apply the whites update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_blacks_changed_smooth(self, value):
+        """Handle blacks slider changes with smooth debounced updates."""
+        self.blacks_adjustment = value
+        self.blacks_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.blacks_update_timer.stop()
+            self.blacks_update_timer.start(self.blacks_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_blacks_update(self):
+        """Apply the blacks update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_texture_changed_smooth(self, value):
+        """Handle texture slider changes with smooth debounced updates."""
+        self.texture_adjustment = value
+        self.texture_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.texture_update_timer.stop()
+            self.texture_update_timer.start(self.texture_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_texture_update(self):
+        """Apply the texture update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_clarity_changed_smooth(self, value):
+        """Handle clarity slider changes with smooth debounced updates."""
+        self.clarity_adjustment = value
+        self.clarity_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.clarity_update_timer.stop()
+            self.clarity_update_timer.start(self.clarity_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_clarity_update(self):
+        """Apply the clarity update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_dehaze_changed_smooth(self, value):
+        """Handle dehaze slider changes with smooth debounced updates."""
+        self.dehaze_adjustment = value
+        self.dehaze_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.dehaze_update_timer.stop()
+            self.dehaze_update_timer.start(self.dehaze_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_dehaze_update(self):
+        """Apply the dehaze update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_vibrance_changed_smooth(self, value):
+        """Handle vibrance slider changes with smooth debounced updates."""
+        self.vibrance_adjustment = value
+        self.vibrance_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.vibrance_update_timer.stop()
+            self.vibrance_update_timer.start(self.vibrance_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_vibrance_update(self):
+        """Apply the vibrance update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_saturation_changed_smooth(self, value):
+        """Handle saturation slider changes with smooth debounced updates."""
+        self.saturation_adjustment = value
+        self.saturation_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.saturation_update_timer.stop()
+            self.saturation_update_timer.start(self.saturation_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_saturation_update(self):
+        """Apply the saturation update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
     def on_shadow_changed_smooth(self, value):
         """Handle shadow slider changes with smooth debounced updates."""
         self.shadow_adjustment = value
@@ -1367,7 +2827,7 @@ class FilmFilterGUI(QMainWindow):
         try:
             if self.current_display_mode == "original":
                 # Show pure original image without any adjustments
-                self.display_image(self.original_image)
+                self.display_image(self.original_image, preserve_zoom_state=True)
             else:
                 # Show image with all adjustments and filters applied
                 # Start with the base image (original or filtered)
@@ -1376,18 +2836,62 @@ class FilmFilterGUI(QMainWindow):
                 else:
                     base_image = self.original_image.copy()
                 
-                # Apply adjustments in order: exposure first, then shadows
+                # Apply adjustments in the correct order for best results
                 adjusted_image = base_image
+                
+                # Apply temperature adjustment
+                if self.temp_adjustment != 0:
+                    adjusted_image = self.apply_temp_to_image(adjusted_image, self.temp_adjustment)
+                
+                # Apply tint adjustment
+                if self.tint_adjustment != 0:
+                    adjusted_image = self.apply_tint_to_image(adjusted_image, self.tint_adjustment)
                 
                 # Apply exposure adjustment
                 if self.exposure_adjustment != 0:
                     adjusted_image = self.apply_exposure_to_image(adjusted_image, self.exposure_adjustment)
                 
-                # Apply shadow adjustment
+                # Apply contrast adjustment
+                if self.contrast_adjustment != 0:
+                    adjusted_image = self.apply_contrast_to_image(adjusted_image, self.contrast_adjustment)
+                
+                # Apply highlights adjustment
+                if self.highlights_adjustment != 0:
+                    adjusted_image = self.apply_highlights_to_image(adjusted_image, self.highlights_adjustment)
+                
+                # Apply shadows adjustment
                 if self.shadow_adjustment != 0:
                     adjusted_image = self.apply_shadow_to_image(adjusted_image, self.shadow_adjustment)
                 
-                self.display_image(adjusted_image)
+                # Apply whites adjustment
+                if self.whites_adjustment != 0:
+                    adjusted_image = self.apply_whites_to_image(adjusted_image, self.whites_adjustment)
+                
+                # Apply blacks adjustment
+                if self.blacks_adjustment != 0:
+                    adjusted_image = self.apply_blacks_to_image(adjusted_image, self.blacks_adjustment)
+                
+                # Apply texture adjustment
+                if self.texture_adjustment != 0:
+                    adjusted_image = self.apply_texture_to_image(adjusted_image, self.texture_adjustment)
+                
+                # Apply clarity adjustment
+                if self.clarity_adjustment != 0:
+                    adjusted_image = self.apply_clarity_to_image(adjusted_image, self.clarity_adjustment)
+                
+                # Apply dehaze adjustment
+                if self.dehaze_adjustment != 0:
+                    adjusted_image = self.apply_dehaze_to_image(adjusted_image, self.dehaze_adjustment)
+                
+                # Apply vibrance adjustment
+                if self.vibrance_adjustment != 0:
+                    adjusted_image = self.apply_vibrance_to_image(adjusted_image, self.vibrance_adjustment)
+                
+                # Apply saturation adjustment
+                if self.saturation_adjustment != 0:
+                    adjusted_image = self.apply_saturation_to_image(adjusted_image, self.saturation_adjustment)
+                
+                self.display_image(adjusted_image, preserve_zoom_state=True)
                 
         except Exception as e:
             print(f"Error applying adjustments: {e}")
@@ -1413,10 +2917,10 @@ class FilmFilterGUI(QMainWindow):
                 # Clip values to valid range [0, 255] and convert back to uint8
                 adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
                 
-                self.display_image(adjusted_image)
+                self.display_image(adjusted_image, preserve_zoom_state=True)
             else:
                 # No adjustment needed
-                self.display_image(base_image)
+                self.display_image(base_image, preserve_zoom_state=True)
                 
         except Exception as e:
             print(f"Error applying exposure: {e}")
@@ -1616,7 +3120,7 @@ class FilmFilterGUI(QMainWindow):
                 self.selected_filter_button = None
                 
                 # Display the image
-                self.display_image(self.original_image)
+                self.display_image(self.original_image, preserve_zoom_state=True)
                 
                 # Enable filter buttons and save button
                 if hasattr(self, 'filter_buttons'):
@@ -1631,20 +3135,97 @@ class FilmFilterGUI(QMainWindow):
                 self.toggle_btn.setEnabled(True)
                 self.update_toggle_button_text()
                 
-                # Reset and enable exposure and shadow sliders
+                # Reset and enable all adjustment sliders
+                if hasattr(self, 'temp_slider'):
+                    self.temp_slider.setValue(0)
+                    self.temp_adjustment = 0
+                    if hasattr(self, 'temp_value_label'):
+                        self.temp_value_label.setText('0')
+                    self.temp_slider.setEnabled(True)
+                
+                if hasattr(self, 'tint_slider'):
+                    self.tint_slider.setValue(0)
+                    self.tint_adjustment = 0
+                    if hasattr(self, 'tint_value_label'):
+                        self.tint_value_label.setText('0')
+                    self.tint_slider.setEnabled(True)
+                
                 if hasattr(self, 'exposure_slider'):
-                    self.exposure_slider.setValue(0)  # Reset to 0 for new image
+                    self.exposure_slider.setValue(0)
                     self.exposure_adjustment = 0
                     if hasattr(self, 'exposure_value_label'):
                         self.exposure_value_label.setText('0')
                     self.exposure_slider.setEnabled(True)
                 
+                if hasattr(self, 'contrast_slider'):
+                    self.contrast_slider.setValue(0)
+                    self.contrast_adjustment = 0
+                    if hasattr(self, 'contrast_value_label'):
+                        self.contrast_value_label.setText('0')
+                    self.contrast_slider.setEnabled(True)
+                
+                if hasattr(self, 'highlights_slider'):
+                    self.highlights_slider.setValue(0)
+                    self.highlights_adjustment = 0
+                    if hasattr(self, 'highlights_value_label'):
+                        self.highlights_value_label.setText('0')
+                    self.highlights_slider.setEnabled(True)
+                
                 if hasattr(self, 'shadow_slider'):
-                    self.shadow_slider.setValue(0)  # Reset to 0 for new image
+                    self.shadow_slider.setValue(0)
                     self.shadow_adjustment = 0
                     if hasattr(self, 'shadow_value_label'):
                         self.shadow_value_label.setText('0')
                     self.shadow_slider.setEnabled(True)
+                
+                if hasattr(self, 'whites_slider'):
+                    self.whites_slider.setValue(0)
+                    self.whites_adjustment = 0
+                    if hasattr(self, 'whites_value_label'):
+                        self.whites_value_label.setText('0')
+                    self.whites_slider.setEnabled(True)
+                
+                if hasattr(self, 'blacks_slider'):
+                    self.blacks_slider.setValue(0)
+                    self.blacks_adjustment = 0
+                    if hasattr(self, 'blacks_value_label'):
+                        self.blacks_value_label.setText('0')
+                    self.blacks_slider.setEnabled(True)
+                
+                if hasattr(self, 'texture_slider'):
+                    self.texture_slider.setValue(0)
+                    self.texture_adjustment = 0
+                    if hasattr(self, 'texture_value_label'):
+                        self.texture_value_label.setText('0')
+                    self.texture_slider.setEnabled(True)
+                
+                if hasattr(self, 'clarity_slider'):
+                    self.clarity_slider.setValue(0)
+                    self.clarity_adjustment = 0
+                    if hasattr(self, 'clarity_value_label'):
+                        self.clarity_value_label.setText('0')
+                    self.clarity_slider.setEnabled(True)
+                
+                if hasattr(self, 'dehaze_slider'):
+                    self.dehaze_slider.setValue(0)
+                    self.dehaze_adjustment = 0
+                    if hasattr(self, 'dehaze_value_label'):
+                        self.dehaze_value_label.setText('0')
+                    self.dehaze_slider.setEnabled(True)
+                
+                if hasattr(self, 'vibrance_slider'):
+                    self.vibrance_slider.setValue(0)
+                    self.vibrance_adjustment = 0
+                    if hasattr(self, 'vibrance_value_label'):
+                        self.vibrance_value_label.setText('0')
+                    self.vibrance_slider.setEnabled(True)
+                
+                if hasattr(self, 'saturation_slider'):
+                    self.saturation_slider.setValue(0)
+                    self.saturation_adjustment = 0
+                    if hasattr(self, 'saturation_value_label'):
+                        self.saturation_value_label.setText('0')
+                    self.saturation_slider.setEnabled(True)
                 
                 # Update image name and metadata display
                 self.update_image_metadata(file_path)
@@ -1928,7 +3509,7 @@ class FilmFilterGUI(QMainWindow):
             h_scroll.setValue(center_x)
             v_scroll.setValue(center_y)
     
-    def display_image(self, cv_image):
+    def display_image(self, cv_image, preserve_zoom_state=False):
         """Display a CV2 image in the QLabel."""
         # Convert BGR to RGB
         rgb_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
@@ -1938,13 +3519,27 @@ class FilmFilterGUI(QMainWindow):
         bytes_per_line = ch * w
         qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
         
-        # Convert to QPixmap and store original
+        # Convert to QPixmap and store for zoom functionality
         pixmap = QPixmap.fromImage(qt_image)
-        self.original_pixmap = pixmap  # Store for zoom functionality
+        self.original_pixmap = pixmap  # Store current edited version for zoom functionality
         
-        # Reset zoom state when displaying new image
-        self.is_zoomed = False
+        # Store current zoom state
+        was_zoomed = getattr(self, 'is_zoomed', False)
         
+        # Reset zoom state only when loading new image (not during editing)
+        if not preserve_zoom_state:
+            self.is_zoomed = False
+            
+        # Apply appropriate zoom level
+        if preserve_zoom_state and was_zoomed:
+            # Maintain 100% zoom when editing
+            self.display_image_at_100_percent(pixmap)
+        else:
+            # Fit to window (default behavior)
+            self.display_image_fit_to_window(pixmap)
+            
+    def display_image_fit_to_window(self, pixmap):
+        """Display image scaled to fit window."""
         # Ensure widget is resizable for fit-to-window mode
         self.image_scroll.setWidgetResizable(True)
         
@@ -1953,6 +3548,19 @@ class FilmFilterGUI(QMainWindow):
         scaled_pixmap = pixmap.scaled(label_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         
         self.image_label.setPixmap(scaled_pixmap)
+        self.image_label.setCursor(QCursor(Qt.ArrowCursor))
+        
+    def display_image_at_100_percent(self, pixmap):
+        """Display image at 100% size (preserving zoom during editing)."""
+        # Disable widget resizing for 100% zoom to enable scrolling
+        self.image_scroll.setWidgetResizable(False)
+        
+        # Set label size to image size for proper scrolling
+        self.image_label.resize(pixmap.size())
+        self.image_label.setPixmap(pixmap)
+        
+        # Set hand cursor when zoomed
+        self.image_label.setCursor(QCursor(Qt.OpenHandCursor))
     
     def apply_filter(self, filter_name, filter_path):
         """Apply a filter to the current image."""
@@ -2032,7 +3640,7 @@ class FilmFilterGUI(QMainWindow):
         self.current_display_mode = "filtered"
         
         # Display the filtered image (exposure is already applied)
-        self.display_image(filtered_image)
+        self.display_image(filtered_image, preserve_zoom_state=True)
         
         # Enable toggle button and update text
         if hasattr(self, 'toggle_btn'):
@@ -2065,7 +3673,7 @@ class FilmFilterGUI(QMainWindow):
         
         # Check if preview is cached with current exposure
         if cache_key in self.preview_cache:
-            self.display_image(self.preview_cache[cache_key])
+            self.display_image(self.preview_cache[cache_key], preserve_zoom_state=True)
         else:
             # Generate preview in background
             self.generate_preview_with_cache_key(filter_name, filter_path, cache_key)
@@ -2083,9 +3691,9 @@ class FilmFilterGUI(QMainWindow):
         # Only restore if we're truly not hovering (not just between filters)
         if not self.is_hovering and self.currently_hovering_filter is None:
             if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
-                self.display_image(self.current_filtered_image)
+                self.display_image(self.current_filtered_image, preserve_zoom_state=True)
             elif self.original_image is not None:
-                self.display_image(self.original_image)
+                self.display_image(self.original_image, preserve_zoom_state=True)
     
     def generate_preview_with_cache_key(self, filter_name, filter_path, cache_key):
         """Generate a preview of the filter with a specific cache key."""
@@ -2148,7 +3756,7 @@ class FilmFilterGUI(QMainWindow):
         
         # Display if still hovering over this filter
         if self.is_hovering:
-            self.display_image(filtered_image)
+            self.display_image(filtered_image, preserve_zoom_state=True)
     
     def on_preview_generated_with_key(self, filtered_image, filter_name, cache_key):
         """Handle preview generation completion with cache key."""
@@ -2157,18 +3765,18 @@ class FilmFilterGUI(QMainWindow):
         
         # Display if still hovering over this filter
         if self.is_hovering:
-            self.display_image(filtered_image)
+            self.display_image(filtered_image, preserve_zoom_state=True)
     
     def show_before(self):
         """Show the original image."""
         if self.original_image is not None:
-            self.display_image(self.original_image)
+            self.display_image(self.original_image, preserve_zoom_state=True)
             self.current_display_mode = "original"
     
     def show_after(self):
         """Show the filtered image."""
         if self.current_filtered_image is not None:
-            self.display_image(self.current_filtered_image)
+            self.display_image(self.current_filtered_image, preserve_zoom_state=True)
             self.current_display_mode = "filtered"
         else:
             # No filter applied yet, show original
