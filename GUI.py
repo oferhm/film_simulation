@@ -16,7 +16,8 @@ import cv2
 import numpy as np
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QLabel, QPushButton, QScrollArea, 
-                            QFileDialog, QMessageBox, QFrame, QSizePolicy, QShortcut)
+                            QFileDialog, QMessageBox, QFrame, QSizePolicy, QShortcut, 
+                            QSlider, QGroupBox)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QPoint
 from PyQt5.QtGui import QPixmap, QImage, QFont, QCursor, QKeySequence
 import importlib.util
@@ -379,6 +380,27 @@ class FilterWorker(QThread):
         return self.apply_s_curve(image, 1.05)
 
 
+class FilterWorkerWithCacheKey(QThread):
+    """Worker thread for applying filters with cache key support."""
+    filterApplied = pyqtSignal(np.ndarray, str, str)  # image, filter_name, cache_key
+    
+    def __init__(self, image, filter_path, filter_name, cache_key):
+        super().__init__()
+        self.image = image
+        self.filter_path = filter_path
+        self.filter_name = filter_name
+        self.cache_key = cache_key
+    
+    def run(self):
+        try:
+            # Apply the filter to the image using FilterWorker logic
+            filter_worker = FilterWorker(self.image, self.filter_path, self.filter_name)
+            filtered_image = filter_worker.apply_filter(self.image, self.filter_path)
+            self.filterApplied.emit(filtered_image, self.filter_name, self.cache_key)
+        except Exception as e:
+            print(f"Error applying filter {self.filter_name}: {e}")
+
+
 class FilmFilterGUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -402,6 +424,12 @@ class FilmFilterGUI(QMainWindow):
         # Get available filters
         self.filters_dir = "film_filters/filters"
         self.available_filters = self.get_available_filters()
+        
+        # Initialize exposure adjustment
+        self.exposure_adjustment = 0  # Range: -100 to +100
+        
+        # Initialize shadow adjustment  
+        self.shadow_adjustment = 0  # Range: -100 to +100
         
         self.init_ui()
         
@@ -493,18 +521,18 @@ class FilmFilterGUI(QMainWindow):
                 margin: 22px 0 22px 0;
             }
             QScrollBar::handle:vertical {
-                background: #555555;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #666666, stop:1 #555555);
                 border: 1px solid #666666;
                 border-radius: 8px;
                 min-height: 30px;
                 margin: 1px;
             }
             QScrollBar::handle:vertical:hover {
-                background: #0078d4;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0078d4, stop:1 #106ebe);
                 border-color: #106ebe;
             }
             QScrollBar::handle:vertical:pressed {
-                background: #005a9e;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #005a9e, stop:1 #004578);
                 border-color: #004578;
             }
             QScrollBar::add-line:vertical {
@@ -550,18 +578,18 @@ class FilmFilterGUI(QMainWindow):
                 margin: 0 22px 0 22px;
             }
             QScrollBar::handle:horizontal {
-                background: #555555;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #666666, stop:1 #555555);
                 border: 1px solid #666666;
                 border-radius: 8px;
                 min-width: 30px;
                 margin: 1px;
             }
             QScrollBar::handle:horizontal:hover {
-                background: #0078d4;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #0078d4, stop:1 #106ebe);
                 border-color: #106ebe;
             }
             QScrollBar::handle:horizontal:pressed {
-                background: #005a9e;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #005a9e, stop:1 #004578);
                 border-color: #004578;
             }
             QScrollBar::add-line:horizontal {
@@ -938,39 +966,218 @@ class FilmFilterGUI(QMainWindow):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
         
-        # Title section
-        title_frame = QFrame()
-        title_frame.setStyleSheet("border: none; background: transparent;")
-        title_layout = QVBoxLayout(title_frame)
-        title_layout.setContentsMargins(0, 0, 0, 0)
+        # Exposure Control Section
+        exposure_frame = QFrame()
+        exposure_frame.setStyleSheet("border: none; background: transparent;")
+        exposure_layout = QHBoxLayout(exposure_frame)
+        exposure_layout.setContentsMargins(0, 16, 0, 0)
+        exposure_layout.setSpacing(12)
         
-        title = QLabel("Film Filters")
-        title.setObjectName("titleLabel")
-        title.setStyleSheet("""
-            #titleLabel {
-                font-size: 20px;
-                font-weight: 700;
-                color: #ffffff;
-                background: transparent;
-                border: none;
-                padding: 0px 0px 8px 0px;
+        # Exposure label on the left
+        exposure_label = QLabel("Exposure")
+        exposure_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        exposure_label.setFixedWidth(70)  # Fixed width for alignment
+        exposure_layout.addWidget(exposure_label)
+        
+        # Exposure slider in the middle
+        self.exposure_slider = QSlider(Qt.Horizontal)
+        self.exposure_slider.setMinimum(-100)
+        self.exposure_slider.setMaximum(100)
+        self.exposure_slider.setValue(0)  # Start in middle
+        
+        # Enhanced smooth slider styling
+        self.exposure_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #555555;
+                height: 4px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #2a2a2a, stop:0.5 #3a3a3a, stop:1 #2a2a2a);
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #888888, stop:0.5 #666666, stop:1 #444444);
+                border: 2px solid #999999;
+                width: 20px;
+                height: 24px;
+                margin: -10px 0;
+                border-radius: 12px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #aaaaaa, stop:0.5 #888888, stop:1 #666666);
+                border-color: #bbbbbb;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #0078d4, stop:0.5 #106ebe, stop:1 #005a9e);
+                border-color: #0078d4;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #0078d4, stop:1 #106ebe);
+                border-radius: 3px;
             }
         """)
-        title.setAlignment(Qt.AlignLeft)
-        title_layout.addWidget(title)
         
-        subtitle = QLabel("Choose a filter to apply")
-        subtitle.setStyleSheet("""
-            font-size: 12px;
+        # Set up smooth value tracking
+        self.exposure_slider.setTracking(True)  # Enable real-time tracking
+        self.exposure_slider.valueChanged.connect(self.on_exposure_changed_smooth)
+        self.exposure_slider.mouseDoubleClickEvent = self.reset_exposure_on_double_click
+        self.exposure_slider.setEnabled(False)  # Disabled until image is loaded
+        
+        # Initialize exposure update timer for smooth updates
+        self.exposure_update_timer = QTimer()
+        self.exposure_update_timer.setSingleShot(True)
+        self.exposure_update_timer.timeout.connect(self.apply_exposure_update)
+        self.exposure_update_delay = 50  # 50ms delay for smooth updates
+        exposure_layout.addWidget(self.exposure_slider)
+        
+        # Exposure value label on the right
+        self.exposure_value_label = QLabel("0")
+        self.exposure_value_label.setAlignment(Qt.AlignCenter)
+        self.exposure_value_label.setStyleSheet("""
+            font-size: 11px;
             color: #aaaaaa;
             background: transparent;
             border: none;
         """)
-        title_layout.addWidget(subtitle)
+        self.exposure_value_label.setFixedWidth(30)  # Fixed width for alignment
+        exposure_layout.addWidget(self.exposure_value_label)
         
-        layout.addWidget(title_frame)
+        layout.addWidget(exposure_frame)
         
-        # Filter buttons area
+        # Shadow Control Section
+        shadow_frame = QFrame()
+        shadow_frame.setStyleSheet("border: none; background: transparent;")
+        shadow_layout = QHBoxLayout(shadow_frame)
+        shadow_layout.setContentsMargins(0, 16, 0, 0)
+        shadow_layout.setSpacing(12)
+        
+        # Shadow label on the left
+        shadow_label = QLabel("Shadows")
+        shadow_label.setStyleSheet("""
+            font-size: 12px;
+            font-weight: normal;
+            color: #ffffff;
+            background: transparent;
+            border: none;
+        """)
+        shadow_label.setFixedWidth(70)  # Fixed width for alignment
+        shadow_layout.addWidget(shadow_label)
+        
+        # Shadow slider in the middle
+        self.shadow_slider = QSlider(Qt.Horizontal)
+        self.shadow_slider.setMinimum(-100)
+        self.shadow_slider.setMaximum(100)
+        self.shadow_slider.setValue(0)  # Start in middle
+        
+        # Enhanced smooth slider styling (same as exposure)
+        self.shadow_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #555555;
+                height: 4px;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #2a2a2a, stop:0.5 #3a3a3a, stop:1 #2a2a2a);
+                border-radius: 2px;
+            }
+            QSlider::handle:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #888888, stop:0.5 #666666, stop:1 #444444);
+                border: 2px solid #999999;
+                width: 20px;
+                height: 24px;
+                margin: -10px 0;
+                border-radius: 12px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #aaaaaa, stop:0.5 #888888, stop:1 #666666);
+                border-color: #bbbbbb;
+            }
+            QSlider::handle:horizontal:pressed {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #0078d4, stop:0.5 #106ebe, stop:1 #005a9e);
+                border-color: #0078d4;
+            }
+            QSlider::sub-page:horizontal {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                    stop:0 #0078d4, stop:1 #106ebe);
+                border-radius: 3px;
+            }
+        """)
+        
+        # Set up smooth value tracking
+        self.shadow_slider.setTracking(True)  # Enable real-time tracking
+        self.shadow_slider.valueChanged.connect(self.on_shadow_changed_smooth)
+        self.shadow_slider.mouseDoubleClickEvent = self.reset_shadow_on_double_click
+        self.shadow_slider.setEnabled(False)  # Disabled until image is loaded
+        
+        # Initialize shadow update timer for smooth updates
+        self.shadow_update_timer = QTimer()
+        self.shadow_update_timer.setSingleShot(True)
+        self.shadow_update_timer.timeout.connect(self.apply_shadow_update)
+        self.shadow_update_delay = 50  # 50ms delay for smooth updates
+        shadow_layout.addWidget(self.shadow_slider)
+        
+        # Shadow value label on the right
+        self.shadow_value_label = QLabel("0")
+        self.shadow_value_label.setAlignment(Qt.AlignCenter)
+        self.shadow_value_label.setStyleSheet("""
+            font-size: 11px;
+            color: #aaaaaa;
+            background: transparent;
+            border: none;
+        """)
+        self.shadow_value_label.setFixedWidth(30)  # Fixed width for alignment
+        shadow_layout.addWidget(self.shadow_value_label)
+        
+        layout.addWidget(shadow_frame)
+        
+        # Collapsible Filter Section
+        filter_group = QGroupBox("Filters")
+        filter_group.setCheckable(True)
+        filter_group.setChecked(True)  # Start expanded
+        filter_group.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: 600;
+                color: #ffffff;
+                background: transparent;
+                border: 1px solid #404040;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+                background: #2d2d2d;
+            }
+            QGroupBox::indicator {
+                width: 12px;
+                height: 12px;
+                margin-right: 6px;
+            }
+            QGroupBox::indicator:checked {
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTMgNkw2IDlMOSAzIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=);
+            }
+            QGroupBox::indicator:unchecked {
+                image: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iMTIiIHZpZXdCb3g9IjAgMCAxMiAxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQgNEw4IDgiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPHBhdGggZD0iTTggNEw0IDgiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KPC9zdmc+Cgo=);
+            }
+        """)
+        
+        filter_group_layout = QVBoxLayout(filter_group)
+        filter_group_layout.setContentsMargins(8, 8, 8, 8)
+        
+        # Filter buttons scroll area
         scroll_area = QScrollArea()
         scroll_area.setStyleSheet("""
             QScrollArea {
@@ -978,6 +1185,19 @@ class FilmFilterGUI(QMainWindow):
                 background-color: transparent;
             }
         """)
+        
+        # Enhanced smooth scrolling properties
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setSizeAdjustPolicy(QScrollArea.AdjustToContents)
+        scroll_area.setWidgetResizable(True)
+        
+        # Enable kinetic scrolling for smoother experience
+        scroll_area.setAttribute(Qt.WA_AcceptTouchEvents, True)
+        
+        # Set scroll step to smaller value for smoother scrolling
+        scroll_area.verticalScrollBar().setSingleStep(10)
+        scroll_area.horizontalScrollBar().setSingleStep(10)
         
         scroll_widget = QWidget()
         scroll_widget.setStyleSheet("background-color: transparent;")
@@ -1008,10 +1228,198 @@ class FilmFilterGUI(QMainWindow):
         
         scroll_layout.addStretch()
         scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        layout.addWidget(scroll_area)
+        filter_group_layout.addWidget(scroll_area)
+        
+        # Connect mouse wheel events for smoother scrolling
+        scroll_area.wheelEvent = lambda event: self.smooth_wheel_event(scroll_area, event)
+        
+        layout.addWidget(filter_group)
         
         return panel
+    
+    def reset_shadow_on_double_click(self, event):
+        """Reset shadow slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.shadow_slider.setValue(0)
+    
+    def reset_exposure_on_double_click(self, event):
+        """Reset exposure slider to 0 on double click."""
+        if event.button() == Qt.LeftButton:
+            self.exposure_slider.setValue(0)
+    
+    def apply_shadow_to_image(self, image, shadow_value):
+        """Apply shadow adjustment to an image and return the adjusted image."""
+        if shadow_value == 0:
+            return image
+        
+        try:
+            # Convert to float for processing
+            img_float = image.astype(np.float32) / 255.0
+            
+            # Calculate shadow mask (darker areas)
+            # Use luminance to identify shadows
+            if len(img_float.shape) == 3:
+                luminance = 0.299 * img_float[:,:,2] + 0.587 * img_float[:,:,1] + 0.114 * img_float[:,:,0]
+            else:
+                luminance = img_float
+            
+            # Create shadow mask: shadows are areas with low luminance
+            shadow_mask = 1.0 - luminance  # Invert so dark areas = 1, bright areas = 0
+            shadow_mask = np.clip(shadow_mask ** 2, 0, 1)  # Square for better falloff
+            
+            # Convert shadow value (-100 to +100) to adjustment factor
+            factor = shadow_value / 100.0
+            
+            # Apply shadow adjustment
+            if len(img_float.shape) == 3:
+                for channel in range(3):
+                    adjustment = factor * shadow_mask
+                    img_float[:,:,channel] = np.clip(img_float[:,:,channel] + adjustment, 0, 1)
+            else:
+                adjustment = factor * shadow_mask
+                img_float = np.clip(img_float + adjustment, 0, 1)
+            
+            # Convert back to uint8
+            adjusted_image = np.clip(img_float * 255, 0, 255).astype(np.uint8)
+            
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying shadow adjustment: {e}")
+            return image
+    
+    def apply_exposure_to_image(self, image, exposure_value):
+        """Apply exposure adjustment to an image and return the adjusted image."""
+        if exposure_value == 0:
+            return image
+        
+        try:
+            # Convert exposure value (-100 to +100) to brightness factor
+            factor = 1.0 + (exposure_value / 100.0)
+            
+            # Apply exposure adjustment to all color channels
+            adjusted_image = image.astype(np.float32) * factor
+            
+            # Clip values to valid range [0, 255] and convert back to uint8
+            adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
+            
+            return adjusted_image
+        except Exception as e:
+            print(f"Error applying exposure: {e}")
+            return image
+    
+    def on_shadow_changed_smooth(self, value):
+        """Handle shadow slider changes with smooth debounced updates."""
+        self.shadow_adjustment = value
+        self.shadow_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.shadow_update_timer.stop()  # Cancel any pending update
+            self.shadow_update_timer.start(self.shadow_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_shadow_update(self):
+        """Apply the shadow update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_exposure_changed_smooth(self, value):
+        """Handle exposure slider changes with smooth debounced updates."""
+        self.exposure_adjustment = value
+        self.exposure_value_label.setText(str(value))
+        
+        # Update toggle button text when adjustments change
+        self.update_toggle_button_text()
+        
+        # Use timer to debounce rapid changes for smoother performance
+        if self.original_image is not None:
+            self.exposure_update_timer.stop()  # Cancel any pending update
+            self.exposure_update_timer.start(self.exposure_update_delay)
+            
+            # If we're currently showing original mode, switch to edited to show changes
+            if self.current_display_mode == "original" and value != 0:
+                self.current_display_mode = "filtered"
+                self.update_toggle_button_text()
+    
+    def apply_exposure_update(self):
+        """Apply the exposure update after the debounce delay."""
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def on_exposure_changed(self, value):
+        """Handle exposure slider changes."""
+        self.exposure_adjustment = value
+        self.exposure_value_label.setText(str(value))
+        
+        # Apply exposure adjustment to current image
+        if self.original_image is not None:
+            self.update_display_with_adjustments()
+    
+    def update_display_with_adjustments(self):
+        """Update the displayed image with current exposure and shadow adjustments."""
+        try:
+            if self.current_display_mode == "original":
+                # Show pure original image without any adjustments
+                self.display_image(self.original_image)
+            else:
+                # Show image with all adjustments and filters applied
+                # Start with the base image (original or filtered)
+                if self.current_filtered_image is not None:
+                    base_image = self.current_filtered_image.copy()
+                else:
+                    base_image = self.original_image.copy()
+                
+                # Apply adjustments in order: exposure first, then shadows
+                adjusted_image = base_image
+                
+                # Apply exposure adjustment
+                if self.exposure_adjustment != 0:
+                    adjusted_image = self.apply_exposure_to_image(adjusted_image, self.exposure_adjustment)
+                
+                # Apply shadow adjustment
+                if self.shadow_adjustment != 0:
+                    adjusted_image = self.apply_shadow_to_image(adjusted_image, self.shadow_adjustment)
+                
+                self.display_image(adjusted_image)
+                
+        except Exception as e:
+            print(f"Error applying adjustments: {e}")
+    
+    def update_display_with_exposure(self):
+        """Update the displayed image with current exposure adjustment."""
+        try:
+            # Start with the base image (original or filtered)
+            if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
+                base_image = self.current_filtered_image.copy()
+            else:
+                base_image = self.original_image.copy()
+            
+            # Apply exposure adjustment
+            if self.exposure_adjustment != 0:
+                # Convert exposure value (-100 to +100) to brightness factor
+                # Positive values brighten, negative values darken
+                factor = 1.0 + (self.exposure_adjustment / 100.0)
+                
+                # Apply exposure adjustment to all color channels
+                adjusted_image = base_image.astype(np.float32) * factor
+                
+                # Clip values to valid range [0, 255] and convert back to uint8
+                adjusted_image = np.clip(adjusted_image, 0, 255).astype(np.uint8)
+                
+                self.display_image(adjusted_image)
+            else:
+                # No adjustment needed
+                self.display_image(base_image)
+                
+        except Exception as e:
+            print(f"Error applying exposure: {e}")
     
     def get_available_filters(self):
         """Get all available filter files."""
@@ -1221,11 +1629,24 @@ class FilmFilterGUI(QMainWindow):
                 
                 # Enable toggle button
                 self.toggle_btn.setEnabled(True)
+                self.update_toggle_button_text()
+                
+                # Reset and enable exposure and shadow sliders
+                if hasattr(self, 'exposure_slider'):
+                    self.exposure_slider.setValue(0)  # Reset to 0 for new image
+                    self.exposure_adjustment = 0
+                    if hasattr(self, 'exposure_value_label'):
+                        self.exposure_value_label.setText('0')
+                    self.exposure_slider.setEnabled(True)
+                
+                if hasattr(self, 'shadow_slider'):
+                    self.shadow_slider.setValue(0)  # Reset to 0 for new image
+                    self.shadow_adjustment = 0
+                    if hasattr(self, 'shadow_value_label'):
+                        self.shadow_value_label.setText('0')
+                    self.shadow_slider.setEnabled(True)
                 
                 # Update image name and metadata display
-                self.update_image_metadata(file_path)
-                
-                # Update image metadata
                 self.update_image_metadata(file_path)
                 
             except Exception as e:
@@ -1302,9 +1723,18 @@ class FilmFilterGUI(QMainWindow):
         
         # Determine which image to save
         if self.current_display_mode == "filtered" and self.current_filtered_image is not None:
-            image_to_save = self.current_filtered_image
+            image_to_save = self.current_filtered_image.copy()
         else:
-            image_to_save = self.original_image
+            image_to_save = self.original_image.copy()
+        
+        # Apply exposure and shadow adjustments before saving
+        if hasattr(self, 'exposure_adjustment') and self.exposure_adjustment != 0:
+            factor = 1.0 + (self.exposure_adjustment / 100.0)
+            image_to_save = image_to_save.astype(np.float32) * factor
+            image_to_save = np.clip(image_to_save, 0, 255).astype(np.uint8)
+        
+        if hasattr(self, 'shadow_adjustment') and self.shadow_adjustment != 0:
+            image_to_save = self.apply_shadow_to_image(image_to_save, self.shadow_adjustment)
         
         # Open Save As dialog
         file_path, _ = QFileDialog.getSaveFileName(
@@ -1540,8 +1970,15 @@ class FilmFilterGUI(QMainWindow):
             for btn in self.filter_buttons:
                 btn.setEnabled(False)
         
+        # Apply current exposure and shadow adjustments to the original image before filtering
+        base_image = self.original_image.copy()
+        if hasattr(self, 'exposure_adjustment') and self.exposure_adjustment != 0:
+            base_image = self.apply_exposure_to_image(base_image, self.exposure_adjustment)
+        if hasattr(self, 'shadow_adjustment') and self.shadow_adjustment != 0:
+            base_image = self.apply_shadow_to_image(base_image, self.shadow_adjustment)
+        
         # Start filter worker thread
-        self.filter_worker = FilterWorker(self.original_image, filter_path, filter_name)
+        self.filter_worker = FilterWorker(base_image, filter_path, filter_name)
         self.filter_worker.filterApplied.connect(self.on_filter_applied)
         self.filter_worker.start()
     
@@ -1582,20 +2019,19 @@ class FilmFilterGUI(QMainWindow):
         self.current_filtered_image = None
         self.current_display_mode = "original"
         
-        # Show original image
+        # Update display with any remaining adjustments (exposure/shadow)
         if self.original_image is not None:
-            self.display_image(self.original_image)
+            self.update_display_with_adjustments()
         
-        # Disable toggle button when no filter
-        if hasattr(self, 'toggle_btn'):
-            self.toggle_btn.setEnabled(False)
+        # Update toggle button based on remaining adjustments
+        self.update_toggle_button_text()
     
     def on_filter_applied(self, filtered_image, filter_name):
         """Handle filter application completion."""
         self.current_filtered_image = filtered_image
         self.current_display_mode = "filtered"
         
-        # Display the filtered image
+        # Display the filtered image (exposure is already applied)
         self.display_image(filtered_image)
         
         # Enable toggle button and update text
@@ -1622,12 +2058,17 @@ class FilmFilterGUI(QMainWindow):
         self.is_hovering = True
         self.currently_hovering_filter = filter_name
         
-        # Check if preview is cached
-        if filter_name in self.preview_cache:
-            self.display_image(self.preview_cache[filter_name])
+        # Create cache key that includes exposure and shadow values
+        exposure_val = getattr(self, 'exposure_adjustment', 0)
+        shadow_val = getattr(self, 'shadow_adjustment', 0)
+        cache_key = f"{filter_name}_exp_{exposure_val}_shd_{shadow_val}"
+        
+        # Check if preview is cached with current exposure
+        if cache_key in self.preview_cache:
+            self.display_image(self.preview_cache[cache_key])
         else:
             # Generate preview in background
-            self.generate_preview(filter_name, filter_path)
+            self.generate_preview_with_cache_key(filter_name, filter_path, cache_key)
     
     def on_filter_hover_left(self):
         """Handle filter button hover leave - restore current view."""
@@ -1646,16 +2087,41 @@ class FilmFilterGUI(QMainWindow):
             elif self.original_image is not None:
                 self.display_image(self.original_image)
     
+    def generate_preview_with_cache_key(self, filter_name, filter_path, cache_key):
+        """Generate a preview of the filter with a specific cache key."""
+        if self.filter_worker and self.filter_worker.isRunning():
+            return
+        
+        # Create a smaller version for faster preview generation
+        base_image = self.get_preview_size_image(self.original_image)
+        
+        # Apply current exposure and shadow adjustments to the base image before filtering
+        if hasattr(self, 'exposure_adjustment') and self.exposure_adjustment != 0:
+            base_image = self.apply_exposure_to_image(base_image, self.exposure_adjustment)
+        if hasattr(self, 'shadow_adjustment') and self.shadow_adjustment != 0:
+            base_image = self.apply_shadow_to_image(base_image, self.shadow_adjustment)
+        
+        # Start preview worker with cache key
+        self.filter_worker = FilterWorkerWithCacheKey(base_image, filter_path, filter_name, cache_key)
+        self.filter_worker.filterApplied.connect(self.on_preview_generated_with_key)
+        self.filter_worker.start()
+    
     def generate_preview(self, filter_name, filter_path):
         """Generate a preview of the filter and cache it."""
         if self.filter_worker and self.filter_worker.isRunning():
             return
         
         # Create a smaller version for faster preview generation
-        preview_image = self.get_preview_size_image(self.original_image)
+        base_image = self.get_preview_size_image(self.original_image)
+        
+        # Apply current exposure and shadow adjustments to the base image before filtering
+        if hasattr(self, 'exposure_adjustment') and self.exposure_adjustment != 0:
+            base_image = self.apply_exposure_to_image(base_image, self.exposure_adjustment)
+        if hasattr(self, 'shadow_adjustment') and self.shadow_adjustment != 0:
+            base_image = self.apply_shadow_to_image(base_image, self.shadow_adjustment)
         
         # Start preview worker
-        self.filter_worker = FilterWorker(preview_image, filter_path, filter_name)
+        self.filter_worker = FilterWorker(base_image, filter_path, filter_name)
         self.filter_worker.filterApplied.connect(self.on_preview_generated)
         self.filter_worker.start()
     
@@ -1684,6 +2150,15 @@ class FilmFilterGUI(QMainWindow):
         if self.is_hovering:
             self.display_image(filtered_image)
     
+    def on_preview_generated_with_key(self, filtered_image, filter_name, cache_key):
+        """Handle preview generation completion with cache key."""
+        # Cache the preview with the specific cache key
+        self.preview_cache[cache_key] = filtered_image
+        
+        # Display if still hovering over this filter
+        if self.is_hovering:
+            self.display_image(filtered_image)
+    
     def show_before(self):
         """Show the original image."""
         if self.original_image is not None:
@@ -1700,33 +2175,108 @@ class FilmFilterGUI(QMainWindow):
             self.show_before()
     
     def toggle_comparison(self):
-        """Toggle between original and edited (filtered) image."""
+        """Toggle between original and edited (filtered + adjustments) image."""
         if self.original_image is None:
             return
             
         if self.current_display_mode == "original":
-            # Currently showing original, switch to filtered
-            if self.current_filtered_image is not None:
-                self.display_image(self.current_filtered_image)
+            # Currently showing original, switch to edited
+            if self.current_filtered_image is not None or self.exposure_adjustment != 0 or self.shadow_adjustment != 0:
                 self.current_display_mode = "filtered"
+                self.update_display_with_adjustments()
             else:
-                # No filter applied, stay on original
+                # No edits to show, stay on original
                 return
         else:
-            # Currently showing filtered, switch to original
-            self.display_image(self.original_image)
+            # Currently showing edited, switch to pure original
             self.current_display_mode = "original"
+            self.update_display_with_adjustments()
             
         # Update button text
         self.update_toggle_button_text()
     
     def update_toggle_button_text(self):
-        """Update the toggle button text based on current display mode."""
+        """Update the toggle button text based on current display mode and available edits."""
         if hasattr(self, 'toggle_btn'):
-            if self.current_display_mode == "original":
+            # Check if any edits exist (filter or adjustments)
+            has_edits = (self.current_filtered_image is not None or 
+                        self.exposure_adjustment != 0 or 
+                        self.shadow_adjustment != 0)
+            
+            if not has_edits:
+                # No edits available, disable toggle
                 self.toggle_btn.setText("Original")
+                self.toggle_btn.setEnabled(False)
             else:
-                self.toggle_btn.setText("Edited")
+                # Edits available, enable toggle with appropriate text
+                self.toggle_btn.setEnabled(True)
+                if self.current_display_mode == "original":
+                    self.toggle_btn.setText("Original")
+                else:
+                    self.toggle_btn.setText("Edited")
+    
+    def smooth_wheel_event(self, scroll_area, event):
+        """Handle mouse wheel events for smoother scrolling with animation."""
+        # Get the scroll bar
+        scroll_bar = scroll_area.verticalScrollBar()
+        
+        # Calculate smooth scroll amount based on wheel delta
+        # Standard wheel delta is 120 units per "notch"
+        delta = event.angleDelta().y()
+        
+        # Apply smooth scrolling with smaller steps for better control
+        smooth_scroll_amount = int(delta / 6)  # Even more granular control
+        
+        # Get current scroll position
+        current_value = scroll_bar.value()
+        target_value = current_value - smooth_scroll_amount
+        
+        # Ensure we stay within bounds
+        target_value = max(scroll_bar.minimum(), min(scroll_bar.maximum(), target_value))
+        
+        # Apply smooth animated scrolling
+        self.animate_scroll(scroll_bar, current_value, target_value)
+        
+        # Accept the event to prevent default handling
+        event.accept()
+    
+    def animate_scroll(self, scroll_bar, start_value, end_value, duration=150):
+        """Animate scroll bar movement for smoother scrolling."""
+        if not hasattr(self, 'scroll_animation_timer'):
+            self.scroll_animation_timer = QTimer()
+            self.scroll_animation_timer.timeout.connect(self.update_scroll_animation)
+        
+        # Stop any existing animation
+        if self.scroll_animation_timer.isActive():
+            self.scroll_animation_timer.stop()
+        
+        # Set up animation parameters
+        self.scroll_animation_start = start_value
+        self.scroll_animation_end = end_value
+        self.scroll_animation_current = start_value
+        self.scroll_animation_scroll_bar = scroll_bar
+        self.scroll_animation_step_size = (end_value - start_value) / (duration / 16)  # 60 FPS
+        self.scroll_animation_steps_remaining = duration // 16
+        
+        # Start animation
+        self.scroll_animation_timer.start(16)  # ~60 FPS
+    
+    def update_scroll_animation(self):
+        """Update scroll animation frame."""
+        if self.scroll_animation_steps_remaining <= 0:
+            # Animation complete
+            self.scroll_animation_timer.stop()
+            self.scroll_animation_scroll_bar.setValue(int(self.scroll_animation_end))
+            return
+        
+        # Calculate eased position (ease-out curve for natural feel)
+        progress = 1.0 - (self.scroll_animation_steps_remaining / (150 / 16))
+        eased_progress = 1 - (1 - progress) ** 3  # Ease-out cubic
+        
+        current_pos = self.scroll_animation_start + (self.scroll_animation_end - self.scroll_animation_start) * eased_progress
+        self.scroll_animation_scroll_bar.setValue(int(current_pos))
+        
+        self.scroll_animation_steps_remaining -= 1
 
 
 def main():
