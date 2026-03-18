@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         self._imgpanel.reset_zoom()
 
         # Display
-        self._imgpanel.show_image(img)
+        self._imgpanel.show_image(img, image_path=path)
         self._imgpanel.set_info(self._build_info_text(path, img))
         self._imgpanel.set_toggle_enabled(False)
         self._imgpanel.set_toggle_text("Original")

@@ -4,6 +4,9 @@ ui/image_panel.py - Image display area with zoom/pan and comparison toggle.
 
 import cv2
 import numpy as np
+from PIL import Image
+from PIL.ExifTags import TAGS
+import os
 from PyQt5.QtWidgets import (
     QFrame, QVBoxLayout, QLabel, QScrollArea, QHBoxLayout, QPushButton
 )
@@ -100,6 +103,47 @@ class ImagePanel(QFrame):
         )
         layout.addWidget(self._name_label)
 
+        # Metadata labels
+        self._metadata_frame = QFrame()
+        self._metadata_frame.setStyleSheet(
+            "background:transparent; border:none; padding:4px 0px;"
+        )
+        metadata_layout = QHBoxLayout(self._metadata_frame)
+        metadata_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_layout.setSpacing(20)
+        metadata_layout.addStretch()
+        
+        self._aperture_label = QLabel("")
+        self._aperture_label.setAlignment(Qt.AlignCenter)
+        self._aperture_label.setStyleSheet(
+            "background:transparent; color:#999999; font-size:11px; border:none;"
+        )
+        metadata_layout.addWidget(self._aperture_label)
+        
+        self._shutter_label = QLabel("")
+        self._shutter_label.setAlignment(Qt.AlignCenter)
+        self._shutter_label.setStyleSheet(
+            "background:transparent; color:#999999; font-size:11px; border:none;"
+        )
+        metadata_layout.addWidget(self._shutter_label)
+        
+        self._iso_label = QLabel("")
+        self._iso_label.setAlignment(Qt.AlignCenter)
+        self._iso_label.setStyleSheet(
+            "background:transparent; color:#999999; font-size:11px; border:none;"
+        )
+        metadata_layout.addWidget(self._iso_label)
+        
+        self._camera_label = QLabel("")
+        self._camera_label.setAlignment(Qt.AlignCenter)
+        self._camera_label.setStyleSheet(
+            "background:transparent; color:#999999; font-size:11px; border:none;"
+        )
+        metadata_layout.addWidget(self._camera_label)
+        
+        metadata_layout.addStretch()
+        layout.addWidget(self._metadata_frame)
+
         # Bottom toolbar
         toolbar = QFrame()
         toolbar.setStyleSheet("""
@@ -142,7 +186,7 @@ class ImagePanel(QFrame):
 
     # ── public API ───────────────────────────────────────────────────────────
 
-    def show_image(self, cv_image: np.ndarray, preserve_zoom: bool = False):
+    def show_image(self, cv_image: np.ndarray, preserve_zoom: bool = False, image_path: str = None):
         """Display a BGR numpy array. Returns the created QPixmap for caching."""
         rgb = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
@@ -155,6 +199,10 @@ class ImagePanel(QFrame):
             self._display_100(pixmap)
         else:
             self._display_fit(pixmap)
+        
+        # Update metadata if image path is provided
+        if image_path:
+            self._update_metadata(image_path)
         
         return pixmap  # Return for caching
 
@@ -180,6 +228,95 @@ class ImagePanel(QFrame):
     def reset_zoom(self):
         self._is_zoomed = False
         self._dragging = False
+
+    def _update_metadata(self, image_path: str):
+        """Extract and display EXIF metadata from image."""
+        try:
+            if not os.path.exists(image_path):
+                self._clear_metadata()
+                return
+            
+            # Extract EXIF data
+            with Image.open(image_path) as img:
+                exif_dict = img._getexif()
+                
+            if exif_dict is not None:
+                aperture_text = ""
+                shutter_text = ""
+                iso_text = ""
+                camera_text = ""
+                
+                # Look for aperture (F-number)
+                if 33437 in exif_dict:  # FNumber
+                    f_num = exif_dict[33437]
+                    if isinstance(f_num, tuple):
+                        aperture = f_num[0] / f_num[1]
+                    else:
+                        aperture = float(f_num)
+                    aperture_text = f"A: f/{aperture:.1f}"
+                
+                # Look for shutter speed (exposure time)
+                if 33434 in exif_dict:  # ExposureTime
+                    exposure = exif_dict[33434]
+                    if isinstance(exposure, tuple):
+                        if exposure[0] == 1:
+                            shutter_text = f"S: 1/{exposure[1]}"
+                        else:
+                            shutter_speed = float(exposure[0]) / float(exposure[1])
+                            if shutter_speed >= 1:
+                                shutter_text = f"S: {shutter_speed:.1f}s"
+                            else:
+                                shutter_text = f"S: 1/{int(1/shutter_speed)}"
+                    else:
+                        exposure_val = float(exposure)
+                        if exposure_val >= 1:
+                            shutter_text = f"S: {exposure_val:.1f}s"
+                        else:
+                            shutter_text = f"S: 1/{int(1/exposure_val)}"
+                
+                # Look for ISO
+                if 34855 in exif_dict:  # ISOSpeedRatings
+                    iso = exif_dict[34855]
+                    if isinstance(iso, (list, tuple)):
+                        iso = iso[0]
+                    iso_text = f"ISO: {int(iso)}"
+                
+                # Look for Camera (Make + Model)
+                camera_make = ""
+                camera_model = ""
+                if 271 in exif_dict:  # Make
+                    camera_make = str(exif_dict[271]).strip()
+                if 272 in exif_dict:  # Model
+                    camera_model = str(exif_dict[272]).strip()
+                
+                if camera_make and camera_model:
+                    # Remove duplicate make from model if present
+                    if camera_make.lower() in camera_model.lower():
+                        camera_text = camera_model
+                    else:
+                        camera_text = f"{camera_make} {camera_model}"
+                elif camera_model:
+                    camera_text = camera_model
+                elif camera_make:
+                    camera_text = camera_make
+                
+                self._aperture_label.setText(aperture_text)
+                self._shutter_label.setText(shutter_text)
+                self._iso_label.setText(iso_text)
+                self._camera_label.setText(camera_text)
+            else:
+                self._clear_metadata()
+                
+        except Exception as e:
+            print(f"Error reading EXIF data: {e}")
+            self._clear_metadata()
+    
+    def _clear_metadata(self):
+        """Clear metadata display."""
+        self._aperture_label.setText("")
+        self._shutter_label.setText("")
+        self._iso_label.setText("")
+        self._camera_label.setText("")
 
     # ── zoom / pan ───────────────────────────────────────────────────────────
 
