@@ -118,6 +118,7 @@ class MainWindow(QMainWindow):
             _cached_edits_hash=None,
             _cached_original_pixmap=None,
             _cached_processed_pixmap=None,
+            _cached_filters={},  # Fresh filter cache for new image
         )
         self._preview_cache.clear()
         self._controls.reset_all()
@@ -175,6 +176,7 @@ class MainWindow(QMainWindow):
             _cached_edits_hash=self._state._cached_edits_hash,
             _cached_original_pixmap=self._state._cached_original_pixmap,  # Keep original pixmap
             _cached_processed_pixmap=None,  # Clear processed pixmap - will be recreated if needed
+            _cached_filters=self._state._cached_filters,  # Keep filter cache
         )
         self._refresh_display()
         self._sync_toggle_button()
@@ -184,7 +186,15 @@ class MainWindow(QMainWindow):
     def _on_filter_selected(self, name: str, path: str):
         if self._state.original_image is None:
             return
-        self._run_filter(self._state.original_image, path, name, is_preview=False)
+            
+        # Check if we have this filter cached
+        if name in self._state._cached_filters:
+            # Use cached result - instant!
+            cached_result = self._state._cached_filters[name]
+            self._on_filter_applied(cached_result, name)
+        else:
+            # Process filter and cache result
+            self._run_filter(self._state.original_image, path, name, is_preview=False)
 
     def _on_filter_deselected(self):
         self._state = AppState(
@@ -192,11 +202,20 @@ class MainWindow(QMainWindow):
             original_filename=self._state.original_filename,
             display_mode="original" if self._state.edits.is_default() else "filtered",
             edits=self._state.edits,
+            # Preserve all caches when deselecting
+            _cached_processed_image=self._state._cached_processed_image,
+            _cached_edits_hash=self._state._cached_edits_hash,
+            _cached_original_pixmap=self._state._cached_original_pixmap,
+            _cached_processed_pixmap=self._state._cached_processed_pixmap,
+            _cached_filters=self._state._cached_filters,
         )
         self._refresh_display()
         self._sync_toggle_button()
 
     def _on_filter_applied(self, filtered: np.ndarray, name: str):
+        # Cache the full-resolution filter result
+        self._state._cached_filters[name] = filtered.copy()
+        
         self._state = AppState(
             original_image=self._state.original_image,
             filtered_image=filtered,
@@ -204,11 +223,12 @@ class MainWindow(QMainWindow):
             original_filename=self._state.original_filename,
             display_mode="filtered",
             edits=self._state.edits,
-            # Invalidate cache since base image changed
+            # Invalidate adjustment cache since base image changed
             _cached_processed_image=None,
             _cached_edits_hash=None,
             _cached_original_pixmap=self._state._cached_original_pixmap,  # Keep original pixmap
             _cached_processed_pixmap=None,  # Clear processed pixmap
+            _cached_filters=self._state._cached_filters,  # Preserve filter cache
         )
         self._refresh_display()
         self._sync_toggle_button()
@@ -259,6 +279,7 @@ class MainWindow(QMainWindow):
                     _cached_edits_hash=self._state._cached_edits_hash,
                     _cached_original_pixmap=self._state._cached_original_pixmap,
                     _cached_processed_pixmap=self._state._cached_processed_pixmap,
+                    _cached_filters=self._state._cached_filters,
                 )
         else:
             self._state = AppState(
@@ -392,43 +413,57 @@ class MainWindow(QMainWindow):
         self.setStyleSheet("""
             QMainWindow, QWidget {
                 background-color: #1e1e1e;
-                color: #ffffff;
+                color: #cccccc;
                 font-family: "Segoe UI", "Arial", sans-serif;
             }
             QFrame {
-                background-color: #2d2d2d;
-                border: 1px solid #404040;
-                border-radius: 8px;
+                background-color: #252526;
+                border: 1px solid #3e3e42;
+                border-radius: 0px;
                 margin: 2px;
             }
-            QLabel  { color: #ffffff; font-size: 12px; }
+            QLabel  { color: #cccccc; font-size: 12px; }
             QScrollArea {
-                border: 1px solid #404040;
-                background-color: #2d2d2d;
-                border-radius: 6px;
+                border: 1px solid #3e3e42;
+                background-color: #252526;
+                border-radius: 0px;
             }
             QScrollBar:vertical {
-                background: #1e1e1e; width: 20px; border-radius: 10px;
-                margin: 22px 0;
+                background: #252526; 
+                width: 14px; 
+                border-radius: 0px;
+                margin: 0px;
             }
             QScrollBar::handle:vertical {
-                background: #666666; border-radius: 8px; min-height: 30px; margin: 1px;
+                background: #424242; 
+                border-radius: 0px; 
+                min-height: 20px; 
+                margin: 0px;
             }
-            QScrollBar::handle:vertical:hover  { background: #0078d4; }
+            QScrollBar::handle:vertical:hover  { background: #4f4f4f; }
             QScrollBar::add-line:vertical,
             QScrollBar::sub-line:vertical {
-                background: #2d2d2d; height: 20px; border-radius: 10px;
+                background: #252526; 
+                height: 0px; 
+                border-radius: 0px;
             }
             QScrollBar:horizontal {
-                background: #1e1e1e; height: 20px; border-radius: 10px;
-                margin: 0 22px;
+                background: #252526; 
+                height: 14px; 
+                border-radius: 0px;
+                margin: 0px;
             }
             QScrollBar::handle:horizontal {
-                background: #666666; border-radius: 8px; min-width: 30px; margin: 1px;
+                background: #424242; 
+                border-radius: 0px; 
+                min-width: 20px; 
+                margin: 0px;
             }
-            QScrollBar::handle:horizontal:hover { background: #0078d4; }
+            QScrollBar::handle:horizontal:hover { background: #4f4f4f; }
             QScrollBar::add-line:horizontal,
             QScrollBar::sub-line:horizontal {
-                background: #2d2d2d; width: 20px; border-radius: 10px;
+                background: #252526; 
+                width: 0px; 
+                border-radius: 0px;
             }
         """)

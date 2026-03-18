@@ -7,27 +7,27 @@ from PyQt5.QtCore import pyqtSignal
 
 _BTN_STYLE = """
     QPushButton {{
-        background-color: #3c3c3c;
-        border: 1px solid #555555;
-        border-radius: 8px;
+        background-color: #383838;
+        border: 1px solid #464647;
+        border-radius: 3px;
         padding: 8px 16px;
         font-size: 13px;
-        font-weight: 500;
-        color: #ffffff;
+        font-weight: 400;
+        color: #cccccc;
         text-align: {align};
     }}
-    QPushButton:hover  {{ background-color: #4c4c4c; border-color: #777777; }}
-    QPushButton:pressed {{ background-color: #2c2c2c; }}
+    QPushButton:hover  {{ background-color: #2a2d2e; border-color: #464647; }}
+    QPushButton:pressed {{ background-color: #094771; }}
     QPushButton:disabled {{
-        background-color: #282828;
-        color: #666666;
-        border-color: #333333;
+        background-color: #252526;
+        color: #656565;
+        border-color: #3e3e42;
     }}
 """
 
 _PATH_LABEL_STYLE = """
     QLabel {
-        color: #888888;
+        color: #cccccc;
         font-size: 11px;
         padding: 4px 8px;
         background-color: transparent;

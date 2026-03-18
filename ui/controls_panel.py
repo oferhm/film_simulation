@@ -52,9 +52,9 @@ class ControlsPanel(QFrame):
         self.setObjectName("controlsPanel")
         self.setStyleSheet("""
             #controlsPanel {
-                background-color: #2d2d2d;
-                border: 1px solid #404040;
-                border-radius: 12px;
+                background-color: #252526;
+                border: 1px solid #3e3e42;
+                border-radius: 0px;
             }
         """)
 
@@ -77,7 +77,8 @@ class ControlsPanel(QFrame):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
         layout.setSpacing(4)
 
         # Sliders
@@ -90,8 +91,6 @@ class ControlsPanel(QFrame):
 
         # Filter group
         group = QGroupBox("Filters")
-        group.setCheckable(True)
-        group.setChecked(True)
         group.setStyleSheet("""
             QGroupBox {
                 font-size: 14px; font-weight: 600; color: #ffffff;
@@ -116,7 +115,7 @@ class ControlsPanel(QFrame):
         inner.setStyleSheet("background: transparent;")
         inner_layout = QVBoxLayout(inner)
         inner_layout.setContentsMargins(0, 0, 0, 0)
-        inner_layout.setSpacing(0)
+        inner_layout.setSpacing(-2)
 
         available = self._discover_filters()
         if not available:

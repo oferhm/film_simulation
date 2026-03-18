@@ -30,9 +30,9 @@ class ImagePanel(QFrame):
         self.setObjectName("imagePanel")
         self.setStyleSheet("""
             #imagePanel {
-                background-color: #1a1a1a;
-                border: 2px solid #333333;
-                border-radius: 12px;
+                background-color: #1e1e1e;
+                border: 1px solid #3e3e42;
+                border-radius: 0px;
             }
         """)
 
@@ -56,9 +56,21 @@ class ImagePanel(QFrame):
         self._scroll = QScrollArea()
         self._scroll.setStyleSheet("""
             QScrollArea {
-                background-color: #0d0d0d;
-                border: 2px solid #444444;
-                border-radius: 8px;
+                background-color: #1e1e1e;
+                border: 1px solid #3e3e42;
+                border-radius: 0px;
+            }
+            QScrollBar:vertical {
+                background-color: #252526;
+                border: none;
+                width: 14px;
+            }
+            QScrollBar::handle:vertical {
+                background-color: #424242;
+                border-radius: 0px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background-color: #4f4f4f;
             }
         """)
         self._scroll.setAlignment(Qt.AlignCenter)
@@ -84,7 +96,7 @@ class ImagePanel(QFrame):
         self._name_label = QLabel("No image loaded")
         self._name_label.setAlignment(Qt.AlignCenter)
         self._name_label.setStyleSheet(
-            "background:transparent; color:#aaaaaa; font-size:12px; padding:8px; border:none;"
+            "background:transparent; color:#cccccc; font-size:12px; padding:8px; border:none;"
         )
         layout.addWidget(self._name_label)
 
@@ -92,9 +104,9 @@ class ImagePanel(QFrame):
         toolbar = QFrame()
         toolbar.setStyleSheet("""
             QFrame {
-                background-color: #2d2d2d;
-                border: 1px solid #404040;
-                border-radius: 8px;
+                background-color: #252526;
+                border: 1px solid #3e3e42;
+                border-radius: 0px;
                 padding: 8px;
             }
         """)
@@ -106,15 +118,23 @@ class ImagePanel(QFrame):
         self._toggle_btn.setEnabled(False)
         self._toggle_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4a4a4a;
-                border: 1px solid #666666;
-                color: white;
+                background-color: #383838;
+                border: 1px solid #464647;
+                color: #cccccc;
                 font-size: 11px;
-                font-weight: 500;
-                padding: 8px 16px;
-                border-radius: 6px;
+                font-weight: 400;
+                padding: 6px 12px;
+                border-radius: 3px;
             }
-            QPushButton:hover { background-color: #5a5a5a; }
+            QPushButton:hover { 
+                background-color: #2a2d2e; 
+                border-color: #464647;
+            }
+            QPushButton:disabled {
+                background-color: #252526;
+                color: #656565;
+                border-color: #3e3e42;
+            }
         """)
         self._toggle_btn.clicked.connect(self.toggleComparison)
         tb_layout.addWidget(self._toggle_btn)

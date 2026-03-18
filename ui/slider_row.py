@@ -8,26 +8,31 @@ from PyQt5.QtCore import Qt, pyqtSignal
 _SLIDER_STYLE = """
     QSlider::groove:horizontal {
         border: none;
-        height: 2px;
-        background: #cccccc;
-        border-radius: 1px;
+        height: 1px;
+        background: #404040;
+        border-radius: 0px;
     }
     QSlider::handle:horizontal {
         background: #ffffff;
-        border: 1px solid #999999;
-        width: 12px;
-        height: 12px;
-        margin: -5px 0;
-        border-radius: 6px;
+        border: none;
+        width: 8px;
+        height: 8px;
+        margin: -3px 0;
+        border-radius: 4px;
     }
-    QSlider::handle:horizontal:hover  { border-color: #666666; }
+    QSlider::handle:horizontal:hover { 
+        background: #e0e0e0;
+    }
     QSlider::handle:horizontal:pressed {
-        background: #f0f0f0;
-        border-color: #333333;
+        background: #cccccc;
     }
     QSlider::sub-page:horizontal {
-        background: #999999;
-        border-radius: 1px;
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                   stop:0 #ffffff, 
+                                   stop:0.3 #cccccc, 
+                                   stop:0.7 #808080, 
+                                   stop:1 #404040);
+        border-radius: 0px;
     }
 """
 
@@ -58,8 +63,8 @@ class SliderRow(QWidget):
         self.setStyleSheet("border: none; background: transparent;")
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 4, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(16)
 
         # Label
         lbl = QLabel(label)
@@ -84,10 +89,10 @@ class SliderRow(QWidget):
 
         # Value label
         self._value_label = QLabel(str(default))
-        self._value_label.setAlignment(Qt.AlignCenter)
-        self._value_label.setFixedWidth(30)
+        self._value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._value_label.setFixedWidth(35)
         self._value_label.setStyleSheet(
-            "font-size:11px; color:#aaaaaa; background:transparent; border:none;"
+            "font-size:12px; color:#ffffff; background:transparent; border:none;"
         )
         layout.addWidget(self._value_label)
 

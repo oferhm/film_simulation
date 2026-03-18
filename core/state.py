@@ -62,10 +62,14 @@ class AppState:
     _cached_edits_hash: Optional[int] = None
     _cached_original_pixmap: Optional = None  # QPixmap cache for original
     _cached_processed_pixmap: Optional = None  # QPixmap cache for processed
+    # Cache for full-resolution filter results
+    _cached_filters: Optional[dict] = None  # {filter_name: filtered_image}
 
     def __post_init__(self):
         if self.edits is None:
             self.edits = EditState()
+        if self._cached_filters is None:
+            self._cached_filters = {}
 
     @property
     def has_edits(self) -> bool:

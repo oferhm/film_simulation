@@ -61,13 +61,82 @@ def kodak_portra(image: np.ndarray) -> np.ndarray:
     return np.clip(img, 0, 1)
 
 
-def ektar_100(image: np.ndarray) -> np.ndarray:
+def kodak_portra_400_2(image: np.ndarray) -> np.ndarray:
+    """Kodak Portra 400 variant 2 - focused on saturation and grain."""
     img = _ensure_bgr_float(image)
-    hsv = cv2.cvtColor(np.clip(img, 0, 1), cv2.COLOR_BGR2HSV)
-    hsv[:, :, 1] *= 1.3
-    hsv[:, :, 2] *= 1.1
+    
+    # ---------- Saturation ----------
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 0.95, 0, 1)
+    hsv = cv2.merge([h, s, v])
     img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-    img = _s_curve(img, 1.3)
+    
+    # ---------- Shadow lift ----------
+    shadow_lift = 0.05
+    img = np.clip(img + shadow_lift * (1 - img), 0, 1)
+    
+    # ---------- Highlight compression ----------
+    img = np.power(img, 0.95)
+    
+    # ---------- Film grain ----------
+    grain_strength = 0.03
+    noise = np.random.normal(0, grain_strength, img.shape)
+    img = np.clip(img + noise, 0, 1)
+    
+    return np.clip(img, 0, 1)
+
+
+def ektar_100(image: np.ndarray) -> np.ndarray:
+    """Kodak Ektar 100 film emulation with detailed processing."""
+    
+    def ektar_curve(img):
+        """Moderate Ektar contrast curve."""
+        curve = np.linspace(0, 1, 256)
+        # softer S-curve than before
+        curve = curve + 0.15 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # ---------- Moderate Ektar contrast curve ----------
+    img = ektar_curve(img)
+    
+    # ---------- Slight color shift ----------
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 1.05, 0, 1)  # subtle blue boost
+    g = np.clip(g * 1.01, 0, 1)
+    r = np.clip(r * 1.05, 0, 1)  # subtle red boost
+    img = cv2.merge([b, g, r])
+    
+    # ---------- Mild saturation boost ----------
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.12, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # ---------- Slight shadow depth ----------
+    img = np.power(img, 1.1)
+    
+    # ---------- Very light highlight bloom ----------
+    blur = cv2.GaussianBlur(img, (0, 0), 5)
+    mask = img > 0.85
+    img[mask] = img[mask] * 0.92 + blur[mask] * 0.08
+    
+    # ---------- Very fine grain (Ektar is clean) ----------
+    grain_strength = 0.017
+    noise = np.random.normal(0, grain_strength, img.shape)
+    img = np.clip(img + noise, 0, 1)
+    
+    # ---------- Shadow lift ----------
+    shadow_lift = 0.07
+    img = np.clip(img + shadow_lift * (1 - img), 0, 1)
+    
     return np.clip(img, 0, 1)
 
 
@@ -125,18 +194,302 @@ def generic(image: np.ndarray) -> np.ndarray:
     return np.clip(_s_curve(img, 1.05), 0, 1)
 
 
+def film_0(image: np.ndarray) -> np.ndarray:
+    """Clean digital film look with subtle warmth."""
+    
+    def soft_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.1 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Soft contrast curve
+    img = soft_curve(img)
+    
+    # Warm color shift
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 0.98, 0, 1)
+    g = np.clip(g * 1.02, 0, 1)
+    r = np.clip(r * 1.08, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Gentle saturation boost
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.08, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_1(image: np.ndarray) -> np.ndarray:
+    """Vintage film with slight desaturation and warmth."""
+    
+    def vintage_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.12 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Vintage contrast
+    img = vintage_curve(img)
+    
+    # Warm vintage color
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 0.92, 0, 1)
+    g = np.clip(g * 1.05, 0, 1) 
+    r = np.clip(r * 1.15, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Reduce saturation slightly
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 0.92, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Light vignette
+    img = _vignette(img, 0.15)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_2(image: np.ndarray) -> np.ndarray:
+    """Cool toned film with enhanced shadows."""
+    
+    def cool_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.18 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Strong contrast curve
+    img = cool_curve(img)
+    
+    # Cool color shift
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 1.08, 0, 1)
+    g = np.clip(g * 0.98, 0, 1)
+    r = np.clip(r * 0.95, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Enhanced saturation
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.15, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Shadow enhancement
+    img = np.power(img, 1.2)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_3_grain(image: np.ndarray) -> np.ndarray:
+    """Classic film with noticeable grain texture."""
+    
+    def classic_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.14 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Classic contrast
+    img = classic_curve(img)
+    
+    # Balanced color
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 1.02, 0, 1)
+    g = np.clip(g * 1.01, 0, 1)
+    r = np.clip(r * 1.03, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Saturation boost
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.1, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Prominent grain
+    grain_strength = 0.025
+    noise = np.random.normal(0, grain_strength, img.shape)
+    img = np.clip(img + noise, 0, 1)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_4_grain(image: np.ndarray) -> np.ndarray:
+    """High contrast film with heavy grain and lifted blacks."""
+    
+    def high_contrast_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.25 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # High contrast curve
+    img = high_contrast_curve(img)
+    
+    # Dramatic color shift
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 0.95, 0, 1)
+    g = np.clip(g * 1.08, 0, 1)
+    r = np.clip(r * 1.12, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Strong saturation
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.2, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Heavy grain
+    grain_strength = 0.035
+    noise = np.random.normal(0, grain_strength, img.shape)
+    img = np.clip(img + noise, 0, 1) 
+    
+    # Black lift
+    shadow_lift = 0.12
+    img = np.clip(img + shadow_lift * (1 - img), 0, 1)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_5(image: np.ndarray) -> np.ndarray:
+    """Dreamy film with highlight bloom and soft contrast."""
+    
+    def dreamy_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.08 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Soft contrast
+    img = dreamy_curve(img)
+    
+    # Warm dreamy tones
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 0.96, 0, 1)
+    g = np.clip(g * 1.03, 0, 1)
+    r = np.clip(r * 1.10, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Gentle saturation
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.05, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Dreamy highlight bloom
+    blur = cv2.GaussianBlur(img, (0, 0), 8)
+    mask = img > 0.75
+    img[mask] = img[mask] * 0.85 + blur[mask] * 0.15
+    
+    # Light shadow lift
+    shadow_lift = 0.05
+    img = np.clip(img + shadow_lift * (1 - img), 0, 1)
+    
+    return np.clip(img, 0, 1)
+
+
+def film_6(image: np.ndarray) -> np.ndarray:
+    """Punchy modern film with enhanced mid-tones."""
+    
+    def punchy_curve(img):
+        curve = np.linspace(0, 1, 256)
+        curve = curve + 0.16 * (curve - 0.5)
+        curve = np.clip(curve, 0, 1)
+        curve = (curve * 255).astype(np.uint8)
+        table = np.array(curve)
+        result = cv2.LUT((img * 255).astype(np.uint8), table)
+        return result.astype(np.float32) / 255.0
+    
+    img = _ensure_bgr_float(image)
+    
+    # Punchy contrast
+    img = punchy_curve(img)
+    
+    # Modern color grading
+    b, g, r = cv2.split(img)
+    b = np.clip(b * 1.05, 0, 1)
+    g = np.clip(g * 1.02, 0, 1) 
+    r = np.clip(r * 1.06, 0, 1)
+    img = cv2.merge([b, g, r])
+    
+    # Vibrant saturation
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    s = np.clip(s * 1.18, 0, 1)
+    hsv = cv2.merge([h, s, v])
+    img = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    # Mid-tone enhancement
+    img = np.power(img, 0.95)
+    
+    # Subtle grain
+    grain_strength = 0.012
+    noise = np.random.normal(0, grain_strength, img.shape)
+    img = np.clip(img + noise, 0, 1)
+    
+    return np.clip(img, 0, 1)
+
+
 # ──────────────────────────────────────────────
 # Dispatch
 # ──────────────────────────────────────────────
 
 _FILTER_MAP: dict[str, callable] = {
     "kodak_portra": kodak_portra,
+    "portra_400_2": kodak_portra_400_2,
     "ektar":        ektar_100,
     "vintage":      vintage,
     "ilford":       ilford_hp5,
     "colorplus":    colorplus_200,   # checked before "bright" variant
+    "kodak_gold":   kodak_gold,
     "gold":         kodak_gold,
     "expired":      expired_film,
+    "film_0":       film_0,
+    "film_1":       film_1, 
+    "film_2":       film_2,
+    "film_3":       film_3_grain,
+    "film_4":       film_4_grain,
+    "film_5":       film_5,
+    "film_6":       film_6,
 }
 
 

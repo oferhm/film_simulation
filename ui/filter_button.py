@@ -7,24 +7,25 @@ from PyQt5.QtCore import QTimer, pyqtSignal
 
 _BASE_STYLE = """
     QPushButton {{
-        background-color: #3c3c3c;
-        border: {border};
-        border-radius: 8px;
+        background-color: {bg_color};
+        border: none;
+        border-radius: 0px;
         padding: {padding};
-        font-size: 13px;
+        font-size: 12px;
         font-weight: {weight};
-        color: #ffffff;
+        color: {text_color};
         text-align: left;
+        margin: 0px;
     }}
     QPushButton:hover {{
-        background-color: #4c4c4c;
+        background-color: {hover_bg};
         border-color: {hover_border};
     }}
-    QPushButton:pressed {{ background-color: #2c2c2c; }}
+    QPushButton:pressed {{ background-color: #094771; }}
     QPushButton:disabled {{
-        background-color: #282828;
-        color: #666666;
-        border-color: #333333;
+        background-color: #252526;
+        color: #656565;
+        border-color: #3e3e42;
     }}
 """
 
@@ -47,7 +48,8 @@ class FilterButton(QPushButton):
         self.filter_name = filter_name
         self.filter_path = filter_path
         self.is_selected = False
-        self.setFixedHeight(45)
+        self.setFixedHeight(24)  # More compact like VS Code
+        self.setContentsMargins(0, 0, 0, 0)
 
         self._hover_timer = QTimer(singleShot=True)
         self._hover_timer.timeout.connect(self._emit_hover)
@@ -81,15 +83,19 @@ class FilterButton(QPushButton):
     def _apply_style(self):
         if self.is_selected:
             self.setStyleSheet(_BASE_STYLE.format(
-                border="2px solid #0078d4",
-                padding="15px 16px",
-                weight="600",
-                hover_border="#106ebe",
+                bg_color="#094771",
+                padding="5px 12px",
+                weight="400",
+                text_color="#cccccc",
+                hover_bg="#1177bb",
+                hover_border="#0078d4",
             ))
         else:
             self.setStyleSheet(_BASE_STYLE.format(
-                border="1px solid #555555",
-                padding="16px",
-                weight="500",
-                hover_border="#777777",
+                bg_color="#383838",
+                padding="5px 12px",
+                weight="400",
+                text_color="#cccccc",
+                hover_bg="#2a2d2e",
+                hover_border="#464647",
             ))
